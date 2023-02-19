@@ -115,8 +115,8 @@ create_midi_message :: (bytes: [] u8) -> MIDI_Message, bool {
 }
 
 create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, channel: u8 = 0) -> MIDI_Message, bool {
-    assert(data0 <= 0x7f);
-    assert(data1 <= 0x7f);
+    assert(data0 <= MIDI_DATA_BYTE_MAX, "First data byte is out of range (value is %, but the maximum allowed value is %).", data0, MIDI_DATA_BYTE_MAX);
+    assert(data1 <= MIDI_DATA_BYTE_MAX, "Second data byte is out of range (value is %, but the maximum allowed value is %).", data1, MIDI_DATA_BYTE_MAX);
     decoder: MIDI_Decoder;
     bytes: [3] u8;
     bytes[0] = make_status_byte(status, channel);
@@ -132,9 +132,9 @@ create_control_change_message :: (controller: Control_Change, value: u8, channel
 }
 
 create_pitch_bend_message :: (value: int, channel: u8 = 0) -> MIDI_Message {
-    assert(value >= 0 && value <= U14_MAX, "Pitch bend value is out of range (allowed range is [0, %], but got %).", U14_MAX, value);
-    coarse := cast,no_check(u8) ((value >> 7) & 0x7f);
-    fine := cast,no_check(u8) (value & 0x7f);
+    assert(value >= 0 && value <= U14_MAX, "Pitch bend value is out of range (value is %, but the allowed range is [0, %]).", value, U14_MAX);
+    coarse := cast,no_check(u8) ((value >> 7) & MIDI_DATA_BYTE_MAX);
+    fine := cast,no_check(u8) (value & MIDI_DATA_BYTE_MAX);
     return create_midi_message(.Pitch_Bend, fine, coarse, channel);
 }
 
@@ -187,15 +187,16 @@ pitch_bend_get_float :: (info: MIDI_Pitch_Bend_Info) -> float {
 
 get_14_bit_value :: (msb: u8, lsb: u8) -> int {
     result: int;
-    result = msb & 0x7f;
+    result = msb & MIDI_DATA_BYTE_MAX;
     result <<= 7;
-    result |= lsb & 0x7f;
+    result |= lsb & MIDI_DATA_BYTE_MAX;
     assert(result >= 0 && result <= U14_MAX);
     return result;
 }
 
 make_status_byte :: (status: MIDI_Status, channel: u8 = 0) -> u8 #expand {
     assert(status < .System_Exclusive || channel == 0, "For a message with status %, no channel value should be set (channel value is %).", status, channel);
+    assert(channel <= MIDI_CHANNEL_MAX, "Channel value is out of range (value is %, but the maximum allowed value is %).", channel, MIDI_CHANNEL_MAX);
     return (cast(u8) status) | channel;
 }
 
@@ -286,7 +287,9 @@ Control_Change :: enum u8 {
     Effects_5_Depth              :: 95;
 }
 
-U14_MAX :: 0x3fff;
+U14_MAX            :: 0x3fff;
+MIDI_DATA_BYTE_MAX :: 0x7f;
+MIDI_CHANNEL_MAX   :: 0x0f;
 
 #scope_module
 
