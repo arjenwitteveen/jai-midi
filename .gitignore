@@ -1,0 +1,5 @@
+.build/
+build/
+midi_files/
+*.exe
+*.pdb
