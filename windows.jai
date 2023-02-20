@@ -79,7 +79,6 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback = null, user_dat
     result.index = source_index;
     result.callback = callback;
     result.callback_data = user_data;
-    result.user_context = *context;
     if callback == null  result.message_queue = create_message_queue();
 
     open_result := midiInOpen(*result.handle, cast(u32) source_index, cast(u64) cast(*void) midi_input_callback, cast(u64) result, CALLBACK_FUNCTION);
@@ -170,7 +169,7 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
 
 MIDI_Input_Platform_Data :: struct {
     handle: HMIDIIN;
-    user_context: *Context;
+    callback_context: Context;
     sysex_buffer_headers: [SYSEX_BUFFER_COUNT] MIDIHDR;
     sysex_buffers: [SYSEX_BUFFER_COUNT] [SYSEX_BUFFER_SIZE] u8;
 }
@@ -211,7 +210,7 @@ SYSEX_BUFFER_SIZE  :: 1024;
 midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64, param2: u64) #c_call {
     input := cast(*MIDI_Input) instance;
 
-    push_context input.user_context {
+    push_context input.callback_context {
         // @Note: If we get an OPEN message, the MIDI_Input struct will not have its handle set yet. We could set it
         // here if we ever want to notify people of events like these.
 

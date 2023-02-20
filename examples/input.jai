@@ -18,13 +18,12 @@ main :: () {
 
             start_time := current_time_monotonic();
             while to_seconds(current_time_monotonic() - start_time) < INPUT_WAIT_SECONDS {
-                // Grab a message from the queue. You can do this in a blocking or non-blocking manner. In this case we
-                // chose for a short timeout period so that we can check the wait timer of the while loop every now and then.
+                // Grab a message from the queue. You can do this in a blocking or non-blocking manner. In this case
+                // we're using a short timeout period so that we can check the condition of the while loop every now and then.
                 message, timestamp, message_success := read_message(input, timeout = 100);
 
                 if message_success  print_message_info(message, timestamp);
             }
-
         } else  log_error("Could not open input for source '%'.", source_name);
     } else  log_error("Source with name '%' could not be found.", source_name);
 }

@@ -140,3 +140,4 @@
 #module_parameters(MESSAGE_QUEUE_SIZE := 256, VERBOSE_LOGGING := false, CLIENT_NAME := "");
 
 #load "midi.jai";
+#load "midi_file.jai";

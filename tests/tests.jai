@@ -6,7 +6,9 @@ MESSAGE_QUEUE_SIZE :: 256;
 VERBOSE_LOGGING :: false;
 CLIENT_NAME :: "";
 
+// We don't directly #import the module, since we want to be able to test functions in module scope.
 #load "../midi.jai";
+#load "../midi_file.jai";
 
 TEST_LOGGING_ENABLED :: true;
 
