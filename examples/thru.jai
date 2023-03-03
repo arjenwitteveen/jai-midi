@@ -21,17 +21,19 @@ Callback_Data :: struct {
 midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) {
     #if LOG_MESSAGES  print_message_info(message, timestamp);
 
-    using callback_data := cast(*Callback_Data) user_data;
-    if wait_for(*write_semaphore, 1) == .SUCCESS {
-        message_queue[write_cursor] = message;
-        signal(*read_semaphore);
-        write_cursor = (write_cursor + 1) % QUEUE_SIZE;
+    if message.status < .System_Exclusive {
+        using callback_data := cast(*Callback_Data) user_data;
+        if wait_for(*write_semaphore, 1) == .SUCCESS {
+            message_queue[write_cursor] = message;
+            signal(*read_semaphore);
+            write_cursor = (write_cursor + 1) % QUEUE_SIZE;
+        }
     }
 }
 
 main :: () {
-    // source_name :: "Keystation Mini 32 MK3";
-    source_name :: "Novation Impulse";
+    // source_name :: "Keystation";
+    source_name :: "Impulse";
     destination_name :: "Synth";
 
     source_index  := get_source_index_by_name(source_name);

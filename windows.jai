@@ -242,9 +242,11 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
                 midi_event_bytes.data = xx header.lpData;
                 midi_event_bytes.count = header.dwBytesRecorded;
 
-                message.status = .System_Exclusive;
-                message.system_exclusive_info.buffer = midi_event_bytes;
-                message_ready = handle_system_exclusive_message(input, midi_event_bytes, error);
+                sysex_message, sysex_message_ready := handle_system_exclusive_message(input, midi_event_bytes, error);
+                if sysex_message_ready {
+                    message = sysex_message;
+                    message_ready = true;
+                }
 
                  // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We should *not*
                  // call reset_sysex_buffers in that case, or bad things will happen!

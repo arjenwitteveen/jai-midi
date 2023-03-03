@@ -428,8 +428,11 @@ midi_input_thread :: (thread: *Thread) -> s64 {
             message_ready: bool;
 
             if event.type == .SYSEX {
-                message.status = .System_Exclusive;
-                message_ready = handle_system_exclusive_message(input, midi_event_bytes, false);
+                sysex_message, sysex_message_ready := handle_system_exclusive_message(input, midi_event_bytes, false);
+                if sysex_message_ready {
+                    message = sysex_message;
+                    message_ready = true;
+                }
             } else {
                 message = decode_midi_bytes(*input.decoder, midi_event_bytes);
                 message_ready = true;

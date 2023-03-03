@@ -320,8 +320,9 @@ reset_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {
     array_reset_keeping_memory(*decoder.message_buffer);
 }
 
-handle_system_exclusive_message :: (input: *MIDI_Input, data: [] u8, error: bool) -> bool {
+handle_system_exclusive_message :: (input: *MIDI_Input, data: [] u8, error: bool) -> MIDI_Message, bool {
     decoder := *input.decoder;
+    result: MIDI_Message;
 
     if error {
         if decoder.message_in_progress {
@@ -329,10 +330,10 @@ handle_system_exclusive_message :: (input: *MIDI_Input, data: [] u8, error: bool
             decoder.message_in_progress = false;
         }
 
-        return false;
+        return result, false;
     }
 
-    if data.count == 0  return false;
+    if data.count == 0  return result, false;
 
     start_status := get_status(data[0]);
     end_status := get_status(data[data.count - 1]);
@@ -344,7 +345,7 @@ handle_system_exclusive_message :: (input: *MIDI_Input, data: [] u8, error: bool
         // Start new system-exclusive message.
         if !message_is_starting {
             assert(false, "Given data does not start with a system-exclusive status byte (expected 0x%, but got 0x%).", formatInt(MIDI_Status.System_Exclusive, base=16), formatInt(start_status, base=16));
-            return false;
+            return result, false;
         }
 
         reset_system_exclusive_buffer(decoder);
@@ -355,7 +356,11 @@ handle_system_exclusive_message :: (input: *MIDI_Input, data: [] u8, error: bool
     decoder.message_in_progress = !message_is_complete;
     decoder.running_status = 0;
 
-    return !decoder.message_in_progress;
+    message_ready := !decoder.message_in_progress;
+
+    if message_ready  result = create_system_exclusive_message(decoder.message_buffer);
+
+    return result, message_ready;
 }
 
 log_verbose :: (format: string, args: ..Any) #expand {
