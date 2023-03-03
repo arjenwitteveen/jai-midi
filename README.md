@@ -1,5 +1,5 @@
 # jai-midi
-This module aims to provide basic MIDI I/O support for Jai programs in a simple to use, cross-platform manner. It allows you to receive MIDI messages from a MIDI source, and send MIDI messages to a MIDI destination. For receiving MIDI data, you have the choice of using a callback function or polling a message queue. There is also basic support for reading MIDI files. The module does not aim to support all the possible functionality that MIDI (or the MIDI driver of each OS) provides. There is no support for MIDI 2.0.
+This module aims to provide basic MIDI I/O support for Jai programs in a simple to use, cross-platform manner. It allows you to receive MIDI messages from a MIDI source, and send MIDI messages to a MIDI destination. There is also basic support for reading MIDI files. The module does not aim to support all the possible functionality that MIDI (or the MIDI driver of each OS) provides. There is no support for MIDI 2.0.
 
 To use this module you need at least Jai beta 0.1.057.
 
@@ -17,8 +17,8 @@ Once the compiler is available for macOS, the goal is to support that as well.
 The following [examples](examples) are available:
 
 - [`output.jai`](examples/output.jai): Demonstrates sending MIDI messages through an output.
-- [`input.jai`](examples/input.jai): Demonstrates receiving MIDI messages through an input using a message queue.
-- [`input_callback.jai`](examples/input_callback.jai): Demonstrates receiving MIDI messages through an input using a callback procedure.
+- [`input.jai`](examples/input.jai): Demonstrates receiving MIDI messages through an input using a callback procedure.
+- [`thru.jai`](examples/thru.jai): Sample showing the use of a queue to pass MIDI messages from the input callback to the main thread.
 - [`dump_sysex.jai`](examples/dump_sysex.jai): A simple command-line program that takes (a part of) the name of a MIDI source, waits until a system-exclusive message is received, and dumps its contents to a file.
 - [`read_midi_file.jai`](examples/read_midi_file.jai): Another simple command-line example which takes a path to a MIDI file and reads it; some properties of the file will be printed.
 
