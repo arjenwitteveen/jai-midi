@@ -103,13 +103,15 @@ system_exclusive_buffer_test :: () {
 
         buffer := u8.[0xf0, 0x12, 0x34, 0x56, 0x78, 0xf7];
 
-        handle_success := handle_system_exclusive_message(*input, buffer, false);
+        message, handle_success := handle_system_exclusive_message(*input, buffer, false);
         assert(handle_success);
 
         assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
         assert(decoder.message_buffer.allocated == 6, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(!decoder.message_in_progress, "Unexpected value for message_in_progress.");
         assert_equal(decoder.message_buffer, buffer);
+        assert_equal(decoder.message_buffer, message.system_exclusive_info.buffer);
+        assert(message.status == .System_Exclusive);
     }
 
     // Test with multiple buffers.
@@ -129,23 +131,30 @@ system_exclusive_buffer_test :: () {
         buffer_2 := slice(buffer, 3, 3);
         buffer_3 := slice(buffer, 6, 3);
 
-        handle_system_exclusive_message(*input, buffer_1, false);
+        message: MIDI_Message;
+        message_ready: bool;
+
+        message, message_ready = handle_system_exclusive_message(*input, buffer_1, false);
         assert(decoder.message_buffer.count == 3, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
         assert(decoder.message_buffer.allocated == 3, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(decoder.message_in_progress, "Unexpected value for message_in_progress.");
         assert_equal(decoder.message_buffer, buffer_1);
+        assert(message_ready == false);
 
-        handle_system_exclusive_message(*input, buffer_2, false);
+        message, message_ready = handle_system_exclusive_message(*input, buffer_2, false);
         assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
         assert(decoder.message_buffer.allocated == 6, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(decoder.message_in_progress, "Unexpected value for message_in_progress.");
         assert_equal(decoder.message_buffer, slice(buffer, 0, 6));
+        assert(message_ready == false);
 
-        handle_system_exclusive_message(*input, buffer_3, false);
+        message, message_ready = handle_system_exclusive_message(*input, buffer_3, false);
         assert(decoder.message_buffer.count == buffer.count, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
         assert(decoder.message_buffer.allocated == buffer.count, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(!decoder.message_in_progress, "Unexpected value for message_in_progress.");
         assert_equal(decoder.message_buffer, buffer);
+        assert_equal(decoder.message_buffer, message.system_exclusive_info.buffer);
+        assert(message_ready == true);
     }
 
     // @TODO: Test sysex message being interrupted by other message (both voice and realtime).
