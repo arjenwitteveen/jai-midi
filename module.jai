@@ -1,8 +1,7 @@
 //
 // This module aims to provide basic MIDI I/O support for Jai programs in a simple to use, cross-platform manner. It
 // allows you to receive MIDI messages from a MIDI source, and send MIDI messages to a MIDI destination. Both regular
-// messages and system-exclusive messages are supported. For receiving MIDI data, you have the choice of using a
-// callback function, or polling a message queue. There is also basic support for reading MIDI files.
+// messages and system-exclusive messages are supported. There is also basic support for reading MIDI files.
 //
 // The module does not aim to support all the possible functionality that MIDI (or the MIDI driver of each OS)
 // provides. There is no support for MIDI 2.0.
@@ -45,17 +44,16 @@
 //
 // * Receiving MIDI.
 //
-// There are two ways of receiving MIDI input: through a callback that you provide, or by letting messages be written
-// into a buffer that you can read from when you want (in a blocking or non-blocking way). The size of the buffer can be
-// controlled using the MESSAGE_QUEUE_SIZE module parameter. If the buffer is full, further incoming messages will be
-// discarded. In the case of a callback, be aware that the callback will generally run on a different thread than your
-// main thread.
+// MIDI messages are received through a callback function that you have to provide. Two things are important to keep in
+// mind. Firstly, the callback will generally run on a different thread than your main thread. Secondly, in general it
+// is not a good idea to call other MIDI functions directly from the callback thread, as not every MIDI backend allows
+// this. If needed, use something like a thread-safe queue to queue MIDI data on instead, and process it on another
+// thread. See the examples for a sample of this.
 //
-//   open_input :: (source_index: int, callback: MIDI_Input_Callback = null, user_data: *void = null) -> *MIDI_Input
+//   open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input
 //
-//     Open an input connection to the MIDI source with the given index; returns null upon failure. If the callback
-//     parameter is null, the message queue will used. If a callback is used, you can pass custom data to it using the
-//     user_data pointer. Callbacks have the following signature:
+//     Open an input connection to the MIDI source with the given index; returns null upon failure. You can pass custom
+//     data to the callback using the user_data pointer. Callbacks have the following signature:
 //
 //       (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) -> ()
 //
@@ -66,24 +64,12 @@
 //
 //     Closes the input and frees its resources.
 //
-//   read_message :: (input: *MIDI_Input, timeout := -1) -> MIDI_Message, Apollo_Time, bool
 //
-//     Read a message from the queue (this is only valid to do if you have not defined a callback for this input). By
-//     default, this call blocks until a message is received; you can optionally provide a timeout in milliseconds. The
-//     returned message and timestamp are analogous to what a callback function receives. The boolean denotes if a
-//     message was successfully read from the queue.
-//
-//
-// A note on system-exclusive messages: there is support for receiving arbitrary-length system-exclusive messages. The
-// payload data for these is stored on a separate queue (which may become full if you don't use a callback and don't
-// poll for messages often enough; further system-exclusive messages will then be discarded). Once either a callback
-// fires or read_message is called, the system-exclusive buffer is transferred from this queue into temporary
-// storage. This may not be the most optimal way of doing things, but this does make using the API easier: you decide if
-// you want to copy the data to keep it around for longer, or just use it when you receive it, forget about it, and call
-// reset_temporary_storage at some later point. This also means everything works the same, regardless of whether you're
-// using a callback or a message queue. The received buffer will include the system-exclusive status bytes (0xf0 and
-// 0xf7) as the first and last bytes. When sending a system-exclusive message, you are also responsible for adding those
-// bytes to the buffer you want to send.
+// A note on system-exclusive messages: the buffers containing these messages will be delivered through the callback,
+// and are valid only while the callback is running. Do not store pointers to those buffers; if you want to keep them
+// around, copy them. The received buffers will include the system-exclusive status bytes (0xf0 and 0xf7) as the first
+// and last bytes. When sending a system-exclusive message, you are also responsible for adding those bytes to the
+// buffer you want to send.
 //
 //
 // * Sending MIDI.
@@ -137,7 +123,7 @@
 // One good source of MIDI information is: https://www.recordingblogs.com/wiki/musical-instrument-digital-interface-midi.
 //
 
-#module_parameters(MESSAGE_QUEUE_SIZE := 256, VERBOSE_LOGGING := false, CLIENT_NAME := "");
+#module_parameters(VERBOSE_LOGGING := false, CLIENT_NAME := "");
 
 #load "midi.jai";
 #load "midi_file.jai";

@@ -2,7 +2,6 @@
 // To run these tests, use this command in the module's main directory: jai first.jai - test
 //
 
-MESSAGE_QUEUE_SIZE :: 256;
 VERBOSE_LOGGING :: false;
 CLIENT_NAME :: "";
 

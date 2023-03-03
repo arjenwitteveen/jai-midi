@@ -10,7 +10,6 @@ MIDI_Input_Callback :: #type (input: *MIDI_Input, message: MIDI_Message, timesta
 
 MIDI_Input :: struct {
     index: int;
-    message_queue: *MIDI_Message_Queue;
     callback: MIDI_Input_Callback;
     callback_data: *void;
     decoder: MIDI_Decoder;
@@ -54,56 +53,8 @@ MIDI_Song_Request_Info          :: struct { song: u8; }
 
 MIDI_Decoder :: struct {
     running_status: u8;
-    system_exclusive_data: MIDI_System_Exclusive_Data;
-}
-
-MIDI_Message_Queue :: struct {
-    buffer: [MESSAGE_QUEUE_SIZE] MIDI_Message;
-    timestamps: [MESSAGE_QUEUE_SIZE] Apollo_Time;
-    read_cursor: int;
-    write_cursor: int;
-    count: int;
-    read_semaphore: Semaphore;
-    write_semaphore: Semaphore;
-}
-
-SYSTEM_EXCLUSIVE_QUEUE_SIZE :: 16; // Must be less than 2^16.
-
-MIDI_System_Exclusive_Data :: struct {
-    queue: [SYSTEM_EXCLUSIVE_QUEUE_SIZE] [..] u8;
-    head: int;
-    tail: int;
-    queue_full: bool;
+    message_buffer: [..] u8;
     message_in_progress: bool;
-}
-
-read_message :: (input: *MIDI_Input, timeout := -1) -> MIDI_Message, Apollo_Time, bool {
-    result: MIDI_Message;
-    timestamp: Apollo_Time;
-
-    queue := input.message_queue;
-
-    if queue == null {
-        if input.callback == null  assert(false, "This input was not initialized; call open_input to create an input.");
-        else                       assert(false, "You cannot use read_message on an input that has a callback function associated with it.");
-        return result, timestamp, false;
-    }
-
-    if wait_for(*queue.read_semaphore, cast(s32) timeout) == .SUCCESS {
-        result = queue.buffer[queue.read_cursor];
-        timestamp = queue.timestamps[queue.read_cursor];
-
-        if result.status == .System_Exclusive {
-            result.system_exclusive_info.buffer = copy_first_buffer_into_temporary_storage_and_pop(*input.decoder);
-        }
-
-        queue.read_cursor = (queue.read_cursor + 1) % queue.buffer.count;
-        signal(*queue.write_semaphore);
-    } else {
-        return result, timestamp, false;
-    }
-
-    return result, timestamp, true;
 }
 
 create_midi_message :: (bytes: [] u8) -> MIDI_Message, bool {
@@ -292,8 +243,7 @@ MIDI_CHANNEL_MAX   :: 0x0f;
 #scope_module
 
 free_input :: (input: *MIDI_Input) {
-    while dequeue_system_exclusive_buffer(*input.decoder) { } // This frees any system-exclusive buffers that might still be queued.
-    free(input.message_queue);
+    array_free(input.decoder.message_buffer);
     free(input);
 }
 
@@ -357,131 +307,55 @@ decode_midi_bytes :: (decoder: *MIDI_Decoder, bytes: [] u8) -> MIDI_Message, boo
 post_message_to_input :: (input: *MIDI_Input, _message: MIDI_Message, timestamp: Apollo_Time) {
     message := _message;
 
-    if input.decoder.system_exclusive_data.message_in_progress && message.status < .System_Exclusive {
-        undo_queue_system_exclusive_buffer(*input.decoder);
-        input.decoder.system_exclusive_data.message_in_progress = false;
+    if input.decoder.message_in_progress && message.status < .System_Exclusive {
+        reset_system_exclusive_buffer(*input.decoder);
+        input.decoder.message_in_progress = false;
         log_verbose("System-exclusive message was interrupted.");
     }
 
-    if input.callback != null {
-        if message.status == .System_Exclusive  message.system_exclusive_info.buffer = copy_first_buffer_into_temporary_storage_and_pop(*input.decoder);
-        input.callback(input, message, timestamp, input.callback_data);
-    } else {
-        enqueue_message(input.message_queue, message, timestamp);
-    }
+    input.callback(input, message, timestamp, input.callback_data);
 }
 
-enqueue_message :: (queue: *MIDI_Message_Queue, message: MIDI_Message, timestamp: Apollo_Time) -> bool {
-    if wait_for(*queue.write_semaphore) == .SUCCESS {
-        queue.buffer[queue.write_cursor] = message;
-        queue.timestamps[queue.write_cursor] = timestamp;
-        queue.write_cursor = (queue.write_cursor + 1) % queue.buffer.count;
-        signal(*queue.read_semaphore);
-    }
-
-    return true;
+reset_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {
+    array_reset_keeping_memory(*decoder.message_buffer);
 }
 
-create_message_queue :: () -> *MIDI_Message_Queue {
-    result := New(MIDI_Message_Queue);
-    init(*result.read_semaphore);
-    init(*result.write_semaphore, result.buffer.count);
-    return result;
-}
+handle_system_exclusive_message :: (input: *MIDI_Input, data: [] u8, error: bool) -> bool {
+    decoder := *input.decoder;
 
-queue_system_exclusive_buffer :: (decoder: *MIDI_Decoder) -> *[..] u8, int {
-    using decoder.system_exclusive_data;
-    if queue_full  return null, -1;
-    buffer := queue.data + head;
-    old_head := head;
-    head = (head + 1) % queue.count;
-    queue_full = head == tail;
-    return buffer, old_head;
-}
-
-dequeue_system_exclusive_buffer :: (decoder: *MIDI_Decoder) -> bool {
-    using decoder.system_exclusive_data;
-    if !queue_full && head == tail  return false;
-    buffer := queue.data + tail;
-    array_reset(buffer);
-    tail = (tail + 1) % queue.count;
-    queue_full = false;
-    return true;
-}
-
-// Get the buffer at the front of the queue.
-get_first_buffer :: (decoder: *MIDI_Decoder) -> *[..] u8 {
-    using decoder.system_exclusive_data;
-    if head == tail && !queue_full  return null;
-    return queue.data + tail;
-}
-
-// Get the buffer added last (used for in-progress system-exclusive messages).
-get_last_buffer :: (decoder: *MIDI_Decoder) -> *[..] u8 {
-    using decoder.system_exclusive_data;
-    if head == tail && !queue_full  return null;
-    last := ifx head > 0 then head - 1 else queue.count - 1;
-    return queue.data + last;
-}
-
-copy_first_buffer_into_temporary_storage_and_pop :: (decoder: *MIDI_Decoder) -> [] u8 {
-    result: [] u8;
-    data := get_first_buffer(decoder);
-    if data {
-        result = NewArray(data.count, u8, initialized = false, allocator = temp);
-        memcpy(result.data, data.data, data.count);
-        dequeue_system_exclusive_buffer(decoder);
-    }
-    return result;
-}
-
-undo_queue_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {
-    using decoder.system_exclusive_data;
-    if !message_in_progress || (!queue_full && head == tail) {
-        assert(false, "Nothing to undo.");
-        return;
-    }
-    head = ifx head > 0 then head - 1 else queue.count - 1;
-    buffer := queue.data + head;
-    array_reset(buffer);
-    queue_full = false;
-}
-
-handle_system_exclusive_message :: (decoder: *MIDI_Decoder, data: [] u8) -> bool {
-    if data.count > 0 {
-        buffer: *[..] u8;
-
-        start_status := get_status(data[0]);
-        end_status := get_status(data[data.count - 1]);
-
-        message_is_starting := start_status == .System_Exclusive;
-        message_is_complete := end_status == .End_Of_System_Exclusive;
-
-        if !decoder.system_exclusive_data.message_in_progress {
-            // Start new system-exclusive message.
-            if !message_is_starting {
-                assert(false, "Given data does not start with a system-exclusive status byte (expected 0x%, but got 0x%).", formatInt(MIDI_Status.System_Exclusive, base=16), formatInt(start_status, base=16));
-                return false;
-            }
-
-            buffer = queue_system_exclusive_buffer(decoder);
-            if buffer == null {
-                assert(false, "The system-exclusive messages queue is full.");
-                return false;
-            }
-
-            array_reset(buffer);
-        } else {
-            // Message in progress, fetch the current buffer and append to that.
-            buffer = get_last_buffer(decoder);
+    if error {
+        if decoder.message_in_progress {
+            log_error("Discarding an invalid system-exclusive message (% bytes).", decoder.message_buffer.count);
+            decoder.message_in_progress = false;
         }
 
-        array_add(buffer, ..data);
-        decoder.system_exclusive_data.message_in_progress = !message_is_complete;
-        decoder.running_status = 0;
+        return false;
     }
 
-    return !decoder.system_exclusive_data.message_in_progress;
+    if data.count == 0  return false;
+
+    start_status := get_status(data[0]);
+    end_status := get_status(data[data.count - 1]);
+
+    message_is_starting := start_status == .System_Exclusive;
+    message_is_complete := end_status == .End_Of_System_Exclusive;
+
+    if !decoder.message_in_progress {
+        // Start new system-exclusive message.
+        if !message_is_starting {
+            assert(false, "Given data does not start with a system-exclusive status byte (expected 0x%, but got 0x%).", formatInt(MIDI_Status.System_Exclusive, base=16), formatInt(start_status, base=16));
+            return false;
+        }
+
+        reset_system_exclusive_buffer(decoder);
+    }
+
+    array_add(*decoder.message_buffer, ..data);
+
+    decoder.message_in_progress = !message_is_complete;
+    decoder.running_status = 0;
+
+    return !decoder.message_in_progress;
 }
 
 log_verbose :: (format: string, args: ..Any) #expand {

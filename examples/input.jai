@@ -1,4 +1,8 @@
-// MIDI input example using a message queue.
+// MIDI input example.
+
+midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) {
+    print_message_info(message, timestamp);
+}
 
 main :: () {
     // First let's list all the MIDI sources.
@@ -10,20 +14,12 @@ main :: () {
     source_index := get_source_index_by_name(source_name, match_full_name = false);
 
     if source_index >= 0 {
-        input := open_input(source_index);
+        input := open_input(source_index, midi_input_callback);
         defer close_input(input);
 
         if input {
             print("Listening for input from '%' for the next % seconds...\n", source_name, INPUT_WAIT_SECONDS);
-
-            start_time := current_time_monotonic();
-            while to_seconds(current_time_monotonic() - start_time) < INPUT_WAIT_SECONDS {
-                // Grab a message from the queue. You can do this in a blocking or non-blocking manner. In this case
-                // we're using a short timeout period so that we can check the condition of the while loop every now and then.
-                message, timestamp, message_success := read_message(input, timeout = 100);
-
-                if message_success  print_message_info(message, timestamp);
-            }
+            sleep_milliseconds(INPUT_WAIT_SECONDS * 1000); // Sleep and wait for messages to come in through the callback.
         } else  log_error("Could not open input for source '%'.", source_name);
     } else  log_error("Source with name '%' could not be found.", source_name);
 }

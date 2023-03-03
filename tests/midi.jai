@@ -98,36 +98,24 @@ midi_utilities_test :: () {
 system_exclusive_buffer_test :: () {
     // Test with single small buffer.
     {
-        decoder: MIDI_Decoder;
-        sysex_data := *decoder.system_exclusive_data;
+        input: MIDI_Input;
+        decoder := *input.decoder;
 
         buffer := u8.[0xf0, 0x12, 0x34, 0x56, 0x78, 0xf7];
 
-        handle_success := handle_system_exclusive_message(*decoder, buffer);
+        handle_success := handle_system_exclusive_message(*input, buffer, false);
         assert(handle_success);
 
-        assert(sysex_data.tail == 0, "Unexpected value % for tail.", sysex_data.tail);
-        assert(sysex_data.head == 1, "Unexpected value % for head.", sysex_data.head);
-        assert(SYSTEM_EXCLUSIVE_QUEUE_SIZE == 1 || !sysex_data.queue_full, "System-exclusive queue is unexpectedly full.");
-        assert(!sysex_data.message_in_progress, "Unexpected value for message_in_progress.");
-
-        assert_equal(get_first_buffer(*decoder), get_last_buffer(*decoder));
-        assert_equal(<<get_first_buffer(*decoder), buffer);
-
-        temp_storage_mark := context.temporary_storage.total_bytes_occupied;
-        first_buffer := copy_first_buffer_into_temporary_storage_and_pop(*decoder);
-        assert_equal(first_buffer, buffer);
-        assert(context.temporary_storage.total_bytes_occupied > temp_storage_mark, "Expected to consume bytes from temporary storage.");
-        assert(sysex_data.tail == 1, "Unexpected value % for tail.", sysex_data.tail);
-        assert(sysex_data.head == 1, "Unexpected value % for head.", sysex_data.head);
-        assert(!sysex_data.queue_full, "System-exclusive queue is unexpectedly full.");
-        assert(!sysex_data.message_in_progress, "Unexpected value for message_in_progress.");
+        assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
+        assert(decoder.message_buffer.allocated == 6, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
+        assert(!decoder.message_in_progress, "Unexpected value for message_in_progress.");
+        assert_equal(decoder.message_buffer, buffer);
     }
 
     // Test with multiple buffers.
     {
-        decoder: MIDI_Decoder;
-        sysex_data := *decoder.system_exclusive_data;
+        input: MIDI_Input;
+        decoder := *input.decoder;
 
         slice :: (array: [] $T, start: int, count: int) -> [] T {
             result: [] T = ---;
@@ -141,39 +129,32 @@ system_exclusive_buffer_test :: () {
         buffer_2 := slice(buffer, 3, 3);
         buffer_3 := slice(buffer, 6, 3);
 
-        handle_system_exclusive_message(*decoder, buffer_1);
-        assert(sysex_data.tail == 0, "Unexpected value % for tail.", sysex_data.tail);
-        assert(sysex_data.head == 1, "Unexpected value % for head.", sysex_data.head);
-        assert(!sysex_data.queue_full, "System-exclusive queue is unexpectedly full.");
-        assert(sysex_data.message_in_progress, "Unexpected value for message_in_progress.");
-        assert_equal(<<get_first_buffer(*decoder), buffer_1);
+        handle_system_exclusive_message(*input, buffer_1, false);
+        assert(decoder.message_buffer.count == 3, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
+        assert(decoder.message_buffer.allocated == 3, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
+        assert(decoder.message_in_progress, "Unexpected value for message_in_progress.");
+        assert_equal(decoder.message_buffer, buffer_1);
 
-        handle_system_exclusive_message(*decoder, buffer_2);
-        assert(sysex_data.tail == 0, "Unexpected value % for tail.", sysex_data.tail);
-        assert(sysex_data.head == 1, "Unexpected value % for head.", sysex_data.head);
-        assert(!sysex_data.queue_full, "System-exclusive queue is unexpectedly full.");
-        assert(sysex_data.message_in_progress, "Unexpected value for message_in_progress.");
+        handle_system_exclusive_message(*input, buffer_2, false);
+        assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
+        assert(decoder.message_buffer.allocated == 6, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
+        assert(decoder.message_in_progress, "Unexpected value for message_in_progress.");
+        assert_equal(decoder.message_buffer, slice(buffer, 0, 6));
 
-        handle_system_exclusive_message(*decoder, buffer_3);
-        assert(sysex_data.tail == 0, "Unexpected value % for tail.", sysex_data.tail);
-        assert(sysex_data.head == 1, "Unexpected value % for head.", sysex_data.head);
-        assert(SYSTEM_EXCLUSIVE_QUEUE_SIZE == 1 || !sysex_data.queue_full, "System-exclusive queue is unexpectedly full.");
-        assert(!sysex_data.message_in_progress, "Unexpected value for message_in_progress.");
-        assert_equal(<<get_first_buffer(*decoder), buffer);
-        assert_equal(get_first_buffer(*decoder), get_last_buffer(*decoder));
-
-        temp_storage_mark := context.temporary_storage.total_bytes_occupied;
-        first_buffer := copy_first_buffer_into_temporary_storage_and_pop(*decoder);
-        assert_equal(first_buffer, buffer);
-        assert(context.temporary_storage.total_bytes_occupied > temp_storage_mark, "Expected to consume bytes from temporary storage.");
-        assert(sysex_data.tail == 1, "Unexpected value % for tail.", sysex_data.tail);
-        assert(sysex_data.head == 1, "Unexpected value % for head.", sysex_data.head);
-        assert(!sysex_data.queue_full, "System-exclusive queue is unexpectedly full.");
-        assert(!sysex_data.message_in_progress, "Unexpected value for message_in_progress.");
+        handle_system_exclusive_message(*input, buffer_3, false);
+        assert(decoder.message_buffer.count == buffer.count, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
+        assert(decoder.message_buffer.allocated == buffer.count, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
+        assert(!decoder.message_in_progress, "Unexpected value for message_in_progress.");
+        assert_equal(decoder.message_buffer, buffer);
     }
+
+    // @TODO: Test sysex message being interrupted by other message (both voice and realtime).
 }
 
 endpoint_info_test :: () {
+
+    dummy_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) { }
+
     number_of_sources := get_number_of_sources();
     test_log("Found % sources.", number_of_sources);
     for 0..number_of_sources - 1 {
@@ -206,6 +187,6 @@ endpoint_info_test :: () {
     destination_info, destination_info_success := get_destination_info(BAD_DEVICE_INDEX);
     assert(!destination_info_success);
 
-    assert(open_input(BAD_DEVICE_INDEX) == null);
+    assert(open_input(BAD_DEVICE_INDEX, dummy_callback) == null);
     assert(open_output(BAD_DEVICE_INDEX) == null);
 }

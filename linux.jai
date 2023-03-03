@@ -68,7 +68,7 @@ get_destination_index_by_name :: (name: string, match_full_name := false) -> int
     return result;
 }
 
-open_input :: (source_index: int, callback: MIDI_Input_Callback = null, user_data: *void = null) -> *MIDI_Input #must {
+open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
     result := New(MIDI_Input);
     result.index = -1;
     result.queue_id = -1;
@@ -138,8 +138,6 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback = null, user_dat
     result.subscription = subscription;
     pipe_result := pipe(*result.thread_notification_pipe);
     assert(pipe_result == 0);
-
-    if callback == null  result.message_queue = create_message_queue();
 
     init(*result.thread_start_semaphore);
 
@@ -431,7 +429,7 @@ midi_input_thread :: (thread: *Thread) -> s64 {
 
             if event.type == .SYSEX {
                 message.status = .System_Exclusive;
-                message_ready = handle_system_exclusive_message(*input.decoder, midi_event_bytes);
+                message_ready = handle_system_exclusive_message(input, midi_event_bytes, false);
             } else {
                 message = decode_midi_bytes(*input.decoder, midi_event_bytes);
                 message_ready = true;

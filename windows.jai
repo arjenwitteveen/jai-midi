@@ -64,7 +64,7 @@ get_destination_index_by_name :: (name: string, match_full_name := false) -> int
     return result;
 }
 
-open_input :: (source_index: int, callback: MIDI_Input_Callback = null, user_data: *void = null) -> *MIDI_Input #must {
+open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
     result := New(MIDI_Input);
     success := false;
     defer if !success  close_input(result);
@@ -79,7 +79,6 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback = null, user_dat
     result.index = source_index;
     result.callback = callback;
     result.callback_data = user_data;
-    if callback == null  result.message_queue = create_message_queue();
 
     open_result := midiInOpen(*result.handle, cast(u32) source_index, cast(u64) cast(*void) midi_input_callback, cast(u64) result, CALLBACK_FUNCTION);
     if error_in(open_result, "Unable to open MIDI device for input")  return null;
@@ -243,21 +242,13 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
                 midi_event_bytes.data = xx header.lpData;
                 midi_event_bytes.count = header.dwBytesRecorded;
 
-                if !error {
-                    if midi_event_bytes.count > 0 { // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We can ignore them.
-                        message.status = .System_Exclusive;
-                        message_ready = handle_system_exclusive_message(*input.decoder, midi_event_bytes);
-                        reset_sysex_buffers(input);
-                    }
-                } else {
-                    if input.decoder.system_exclusive_data.message_in_progress {
-                        undo_queue_system_exclusive_buffer(*input.decoder);
-                        input.decoder.system_exclusive_data.message_in_progress = false;
-                        reset_sysex_buffers(input);
-                    }
+                message.status = .System_Exclusive;
+                message.system_exclusive_info.buffer = midi_event_bytes;
+                message_ready = handle_system_exclusive_message(input, midi_event_bytes, error);
 
-                    log_error("Discarding an invalid system-exclusive message (length: % bytes).", midi_event_bytes.count);
-                }
+                 // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We should *not*
+                 // call reset_sysex_buffers in that case, or bad things will happen!
+                if midi_event_bytes.count > 0  reset_sysex_buffers(input);
             }
 
             case .OPEN; // Input is opened.
