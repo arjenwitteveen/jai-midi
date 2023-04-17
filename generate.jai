@@ -36,8 +36,28 @@ generate_bindings :: () -> bool {
             array_add(*extra_clang_arguments, "-x", "c++");
             array_add(*generate_enums_from_macros_with_prefixes, "SND_SEQ_PORT_CAP_", "SND_SEQ_PORT_TYPE_", "SND_SEQ_REMOVE_", "MIDI_CMD_", "MIDI_CTL_");
             visitor = alsa_visitor;
-        } else {
-            #assert false "The current operating system is not supported yet.";
+        } else #if OS == .MACOS {
+            MACOS_SDK_PATH :: "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+            LIBC_PATH :: #run sprint("%/usr/include", MACOS_SDK_PATH);
+            FRAMEWORKS_PATH :: #run sprint("%/System/Library/Frameworks", MACOS_SDK_PATH);
+            COREMIDI_PATH :: #run sprint("%/CoreMIDI.framework/Headers", FRAMEWORKS_PATH);
+
+            output_filename = "bindings_macos.jai";
+            array_add(*libnames, "libc");
+            array_add(*libnames, "CoreMIDI");
+            array_add(*system_include_paths, GENERATOR_DEFAULT_SYSTEM_INCLUDE_PATH);
+            array_add(*system_include_paths, LIBC_PATH);
+            array_add(*source_files,  tprint("%/CoreMIDI.h", COREMIDI_PATH));
+            array_add(*path_fragments_to_treat_as_non_system_paths,
+                      "MIDICapabilityInquiry.h",
+                      "MIDIDriver.h",
+                      "MIDIMessages.h",
+                      "MIDINetworkSession.h",
+                      "MIDIServices.h",
+                      "MIDISetup.h",
+                      "MIDIThruConnection.h");
+
+            array_add(*extra_clang_arguments, "-isysroot", MACOS_SDK_PATH, "-x", "c", tprint("-F%", FRAMEWORKS_PATH));
         }
     }
 
