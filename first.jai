@@ -64,6 +64,7 @@ do_examples :: (build: bool, clean: bool) {
             options.output_path = EXAMPLES_PATH;
             options.output_type = .EXECUTABLE;
             options.output_executable_name = file_name_without_extension;
+            set_optimization(*options, .DEBUG);
             set_build_options(options, w);
 
             compiler_begin_intercept(w);

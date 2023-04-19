@@ -38,32 +38,6 @@ get_destination_name :: (index: int, include_port_info := true) -> string #must 
     return "";
 }
 
-get_source_index_by_name :: (name: string, match_full_name := false) -> int {
-    result := -1;
-    sources := get_number_of_sources();
-    for 0..sources - 1 {
-        source_name := get_source_name(it);
-        if (!match_full_name && contains(source_name, name)) || source_name == name {
-            result = it;
-            break;
-        }
-    }
-    return result;
-}
-
-get_destination_index_by_name :: (name: string, match_full_name := false) -> int {
-    result := -1;
-    destinations := get_number_of_destinations();
-    for 0..destinations - 1 {
-        destination_name := get_destination_name(it);
-        if (!match_full_name && contains(destination_name, name)) || destination_name == name {
-            result = it;
-            break;
-        }
-    }
-    return result;
-}
-
 open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
     result := New(MIDI_Input);
     success := false;

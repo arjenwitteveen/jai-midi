@@ -11,7 +11,7 @@ generate_bindings :: () -> bool {
 
         array_add(*system_include_paths, GENERATOR_DEFAULT_SYSTEM_INCLUDE_PATH);
 
-        generate_compile_time_struct_checks = false;
+        generate_compile_time_struct_checks = true;
 
         #if OS == .WINDOWS {
             output_filename = "bindings_windows.jai";
@@ -48,16 +48,22 @@ generate_bindings :: () -> bool {
             array_add(*system_include_paths, GENERATOR_DEFAULT_SYSTEM_INCLUDE_PATH);
             array_add(*system_include_paths, LIBC_PATH);
             array_add(*source_files,  tprint("%/CoreMIDI.h", COREMIDI_PATH));
+            // array_add(*source_files,  tprint("%/MacTypes.h", LIBC_PATH));
             array_add(*path_fragments_to_treat_as_non_system_paths,
+                      // "MacTypes.h",
                       "MIDICapabilityInquiry.h",
-                      "MIDIDriver.h",
+                      // "MIDIDriver.h",
                       "MIDIMessages.h",
                       "MIDINetworkSession.h",
                       "MIDIServices.h",
                       "MIDISetup.h",
                       "MIDIThruConnection.h");
 
+            footer = MACOS_FOOTER;
+
             array_add(*extra_clang_arguments, "-isysroot", MACOS_SDK_PATH, "-x", "c", tprint("-F%", FRAMEWORKS_PATH));
+
+            visitor = macos_visitor;
         }
     }
 
@@ -156,6 +162,15 @@ alsa_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_V
 }
 
 
+macos_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_Visit_Result {
+    // @TODO: The members with type MIDITimeStamp (u64) are 8 byte aligned, but in C they are 4 byte aligned...
+    // if decl.name == "timeStamp" {
+
+    // }
+
+    return .RECURSE;
+}
+
 #scope_file
 
 #import "Basic";
@@ -164,3 +179,71 @@ alsa_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_V
 // #import "Check";
 #import "Bindings_Generator";
 #import "File";
+
+
+MACOS_FOOTER :: #string END
+
+#scope_export
+
+UTF32Char :: u32;
+ConstStringPtr :: *u8;
+StringPtr :: *u8;
+ConstStr255Param :: *u8;
+OSErr :: s16;
+OSStatus :: s32;
+LogicalAddress :: *void;
+ConstLogicalAddress :: *void;
+PhysicalAddress :: *void;
+BytePtr :: *u8;
+ByteCount :: u64;
+ByteOffset :: u64;
+Duration :: s32;
+AbsoluteTime :: UnsignedWide;
+OptionBits :: u32;
+ItemCount :: u64;
+PBVersion :: u32;
+ScriptCode :: s16;
+LangCode :: s16;
+RegionCode :: s16;
+FourCharCode :: u32;
+OSType :: FourCharCode;
+ResType :: FourCharCode;
+OSTypePtr :: *OSType;
+ResTypePtr :: *ResType;
+Boolean :: u8;
+dispatch_queue_t :: *struct{};
+
+// See Objective_C_Block_Basic in Objective-C. There are parts of the C API
+// that use blocks so it may be valuable to include that full definition here.
+Block :: *struct{};
+
+wide :: struct {
+    lo: u32;
+    hi: s32;
+}
+
+UnsignedWide :: struct {
+    lo: u32;
+    hi: u32;
+}
+
+Fixed :: s32;
+FixedPtr :: *Fixed;
+Fract :: s32;
+FractPtr :: *Fract;
+UnsignedFixed :: u32;
+UnsignedFixedPtr :: *UnsignedFixed;
+ShortFixed :: s16;
+ShortFixedPtr :: *ShortFixed;
+
+Float32 :: float;
+Float64 :: float64;
+
+Byte :: u8;
+SignedByte :: s8;
+WidePtr :: *wide;
+UnsignedWidePtr :: *UnsignedWide;
+
+#import "macos";
+
+END

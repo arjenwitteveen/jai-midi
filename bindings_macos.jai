@@ -111,9 +111,19 @@ MIDIReadBlock :: Block;
 MIDICompletionProc :: #type (request: *MIDISysexSendRequest) -> void #c_call;
 
 MIDIEventPacket :: struct {
-    timeStamp: MIDITimeStamp;
+    timeStamp: MIDITimeStamp #align 4;
     wordCount: u32;
     words:     [64] u32;
+}
+#run {
+    instance: MIDIEventPacket;
+    assert(((cast(*void)(*instance.timeStamp)) - cast(*void)(*instance)) == 0, "MIDIEventPacket.timeStamp has unexpected offset % instead of 0", ((cast(*void)(*instance.timeStamp)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIEventPacket.timeStamp)) == 8, "MIDIEventPacket.timeStamp has unexpected size % instead of 8", size_of(type_of(MIDIEventPacket.timeStamp)));
+    assert(((cast(*void)(*instance.wordCount)) - cast(*void)(*instance)) == 8, "MIDIEventPacket.wordCount has unexpected offset % instead of 8", ((cast(*void)(*instance.wordCount)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIEventPacket.wordCount)) == 4, "MIDIEventPacket.wordCount has unexpected size % instead of 4", size_of(type_of(MIDIEventPacket.wordCount)));
+    assert(((cast(*void)(*instance.words)) - cast(*void)(*instance)) == 12, "MIDIEventPacket.words has unexpected offset % instead of 12", ((cast(*void)(*instance.words)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIEventPacket.words)) == 256, "MIDIEventPacket.words has unexpected size % instead of 256", size_of(type_of(MIDIEventPacket.words)));
+    assert(size_of(MIDIEventPacket) == 268, "MIDIEventPacket has size % instead of 268", size_of(MIDIEventPacket));
 }
 
 MIDIEventList :: struct {
@@ -121,16 +131,44 @@ MIDIEventList :: struct {
     numPackets: u32;
     packet:     [1] MIDIEventPacket;
 }
+#run {
+    instance: MIDIEventList;
+    assert(((cast(*void)(*instance.protocol)) - cast(*void)(*instance)) == 0, "MIDIEventList.protocol has unexpected offset % instead of 0", ((cast(*void)(*instance.protocol)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIEventList.protocol)) == 4, "MIDIEventList.protocol has unexpected size % instead of 4", size_of(type_of(MIDIEventList.protocol)));
+    assert(((cast(*void)(*instance.numPackets)) - cast(*void)(*instance)) == 4, "MIDIEventList.numPackets has unexpected offset % instead of 4", ((cast(*void)(*instance.numPackets)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIEventList.numPackets)) == 4, "MIDIEventList.numPackets has unexpected size % instead of 4", size_of(type_of(MIDIEventList.numPackets)));
+    assert(((cast(*void)(*instance.packet)) - cast(*void)(*instance)) == 8, "MIDIEventList.packet has unexpected offset % instead of 8", ((cast(*void)(*instance.packet)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIEventList.packet)) == 268, "MIDIEventList.packet has unexpected size % instead of 268", size_of(type_of(MIDIEventList.packet)));
+    assert(size_of(MIDIEventList) == 276, "MIDIEventList has size % instead of 276", size_of(MIDIEventList));
+}
 
 MIDIPacket :: struct {
-    timeStamp: MIDITimeStamp;
+    timeStamp: MIDITimeStamp #align 4;
     length:    u16;
     data:      [256] Byte;
+}
+#run {
+    instance: MIDIPacket;
+    assert(((cast(*void)(*instance.timeStamp)) - cast(*void)(*instance)) == 0, "MIDIPacket.timeStamp has unexpected offset % instead of 0", ((cast(*void)(*instance.timeStamp)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIPacket.timeStamp)) == 8, "MIDIPacket.timeStamp has unexpected size % instead of 8", size_of(type_of(MIDIPacket.timeStamp)));
+    assert(((cast(*void)(*instance.length)) - cast(*void)(*instance)) == 8, "MIDIPacket.length has unexpected offset % instead of 8", ((cast(*void)(*instance.length)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIPacket.length)) == 2, "MIDIPacket.length has unexpected size % instead of 2", size_of(type_of(MIDIPacket.length)));
+    assert(((cast(*void)(*instance.data)) - cast(*void)(*instance)) == 10, "MIDIPacket.data has unexpected offset % instead of 10", ((cast(*void)(*instance.data)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIPacket.data)) == 256, "MIDIPacket.data has unexpected size % instead of 256", size_of(type_of(MIDIPacket.data)));
+    assert(size_of(MIDIPacket) == 268, "MIDIPacket has size % instead of 268", size_of(MIDIPacket));
 }
 
 MIDIPacketList :: struct {
     numPackets: u32;
-    packet:     [1] MIDIPacket #align 4;
+    packet:     [1] MIDIPacket;
+}
+#run {
+    instance: MIDIPacketList;
+    assert(((cast(*void)(*instance.numPackets)) - cast(*void)(*instance)) == 0, "MIDIPacketList.numPackets has unexpected offset % instead of 0", ((cast(*void)(*instance.numPackets)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIPacketList.numPackets)) == 4, "MIDIPacketList.numPackets has unexpected size % instead of 4", size_of(type_of(MIDIPacketList.numPackets)));
+    assert(((cast(*void)(*instance.packet)) - cast(*void)(*instance)) == 4, "MIDIPacketList.packet has unexpected offset % instead of 4", ((cast(*void)(*instance.packet)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIPacketList.packet)) == 268, "MIDIPacketList.packet has unexpected size % instead of 268", size_of(type_of(MIDIPacketList.packet)));
+    assert(size_of(MIDIPacketList) == 272, "MIDIPacketList has size % instead of 272", size_of(MIDIPacketList));
 }
 
 MIDISysexSendRequest :: struct {
@@ -141,6 +179,24 @@ MIDISysexSendRequest :: struct {
     reserved:         [3] Byte;
     completionProc:   MIDICompletionProc;
     completionRefCon: *void;
+}
+#run {
+    instance: MIDISysexSendRequest;
+    assert(((cast(*void)(*instance.destination)) - cast(*void)(*instance)) == 0, "MIDISysexSendRequest.destination has unexpected offset % instead of 0", ((cast(*void)(*instance.destination)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDISysexSendRequest.destination)) == 4, "MIDISysexSendRequest.destination has unexpected size % instead of 4", size_of(type_of(MIDISysexSendRequest.destination)));
+    assert(((cast(*void)(*instance.data)) - cast(*void)(*instance)) == 8, "MIDISysexSendRequest.data has unexpected offset % instead of 8", ((cast(*void)(*instance.data)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDISysexSendRequest.data)) == 8, "MIDISysexSendRequest.data has unexpected size % instead of 8", size_of(type_of(MIDISysexSendRequest.data)));
+    assert(((cast(*void)(*instance.bytesToSend)) - cast(*void)(*instance)) == 16, "MIDISysexSendRequest.bytesToSend has unexpected offset % instead of 16", ((cast(*void)(*instance.bytesToSend)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDISysexSendRequest.bytesToSend)) == 4, "MIDISysexSendRequest.bytesToSend has unexpected size % instead of 4", size_of(type_of(MIDISysexSendRequest.bytesToSend)));
+    assert(((cast(*void)(*instance.complete)) - cast(*void)(*instance)) == 20, "MIDISysexSendRequest.complete has unexpected offset % instead of 20", ((cast(*void)(*instance.complete)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDISysexSendRequest.complete)) == 1, "MIDISysexSendRequest.complete has unexpected size % instead of 1", size_of(type_of(MIDISysexSendRequest.complete)));
+    assert(((cast(*void)(*instance.reserved)) - cast(*void)(*instance)) == 21, "MIDISysexSendRequest.reserved has unexpected offset % instead of 21", ((cast(*void)(*instance.reserved)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDISysexSendRequest.reserved)) == 3, "MIDISysexSendRequest.reserved has unexpected size % instead of 3", size_of(type_of(MIDISysexSendRequest.reserved)));
+    assert(((cast(*void)(*instance.completionProc)) - cast(*void)(*instance)) == 24, "MIDISysexSendRequest.completionProc has unexpected offset % instead of 24", ((cast(*void)(*instance.completionProc)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDISysexSendRequest.completionProc)) == 8, "MIDISysexSendRequest.completionProc has unexpected size % instead of 8", size_of(type_of(MIDISysexSendRequest.completionProc)));
+    assert(((cast(*void)(*instance.completionRefCon)) - cast(*void)(*instance)) == 32, "MIDISysexSendRequest.completionRefCon has unexpected offset % instead of 32", ((cast(*void)(*instance.completionRefCon)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDISysexSendRequest.completionRefCon)) == 8, "MIDISysexSendRequest.completionRefCon has unexpected size % instead of 8", size_of(type_of(MIDISysexSendRequest.completionRefCon)));
+    assert(size_of(MIDISysexSendRequest) == 40, "MIDISysexSendRequest has size % instead of 40", size_of(MIDISysexSendRequest));
 }
 
 MIDINotificationMessageID :: s32;
@@ -166,6 +222,14 @@ MIDINotification :: struct {
     messageID:   MIDINotificationMessageID;
     messageSize: u32;
 }
+#run {
+    instance: MIDINotification;
+    assert(((cast(*void)(*instance.messageID)) - cast(*void)(*instance)) == 0, "MIDINotification.messageID has unexpected offset % instead of 0", ((cast(*void)(*instance.messageID)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDINotification.messageID)) == 4, "MIDINotification.messageID has unexpected size % instead of 4", size_of(type_of(MIDINotification.messageID)));
+    assert(((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)) == 4, "MIDINotification.messageSize has unexpected offset % instead of 4", ((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDINotification.messageSize)) == 4, "MIDINotification.messageSize has unexpected size % instead of 4", size_of(type_of(MIDINotification.messageSize)));
+    assert(size_of(MIDINotification) == 8, "MIDINotification has size % instead of 8", size_of(MIDINotification));
+}
 
 MIDIObjectAddRemoveNotification :: struct {
     messageID:   MIDINotificationMessageID;
@@ -175,6 +239,22 @@ MIDIObjectAddRemoveNotification :: struct {
     child:       MIDIObjectRef;
     childType:   MIDIObjectType;
 }
+#run {
+    instance: MIDIObjectAddRemoveNotification;
+    assert(((cast(*void)(*instance.messageID)) - cast(*void)(*instance)) == 0, "MIDIObjectAddRemoveNotification.messageID has unexpected offset % instead of 0", ((cast(*void)(*instance.messageID)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectAddRemoveNotification.messageID)) == 4, "MIDIObjectAddRemoveNotification.messageID has unexpected size % instead of 4", size_of(type_of(MIDIObjectAddRemoveNotification.messageID)));
+    assert(((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)) == 4, "MIDIObjectAddRemoveNotification.messageSize has unexpected offset % instead of 4", ((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectAddRemoveNotification.messageSize)) == 4, "MIDIObjectAddRemoveNotification.messageSize has unexpected size % instead of 4", size_of(type_of(MIDIObjectAddRemoveNotification.messageSize)));
+    assert(((cast(*void)(*instance.parent)) - cast(*void)(*instance)) == 8, "MIDIObjectAddRemoveNotification.parent has unexpected offset % instead of 8", ((cast(*void)(*instance.parent)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectAddRemoveNotification.parent)) == 4, "MIDIObjectAddRemoveNotification.parent has unexpected size % instead of 4", size_of(type_of(MIDIObjectAddRemoveNotification.parent)));
+    assert(((cast(*void)(*instance.parentType)) - cast(*void)(*instance)) == 12, "MIDIObjectAddRemoveNotification.parentType has unexpected offset % instead of 12", ((cast(*void)(*instance.parentType)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectAddRemoveNotification.parentType)) == 4, "MIDIObjectAddRemoveNotification.parentType has unexpected size % instead of 4", size_of(type_of(MIDIObjectAddRemoveNotification.parentType)));
+    assert(((cast(*void)(*instance.child)) - cast(*void)(*instance)) == 16, "MIDIObjectAddRemoveNotification.child has unexpected offset % instead of 16", ((cast(*void)(*instance.child)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectAddRemoveNotification.child)) == 4, "MIDIObjectAddRemoveNotification.child has unexpected size % instead of 4", size_of(type_of(MIDIObjectAddRemoveNotification.child)));
+    assert(((cast(*void)(*instance.childType)) - cast(*void)(*instance)) == 20, "MIDIObjectAddRemoveNotification.childType has unexpected offset % instead of 20", ((cast(*void)(*instance.childType)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectAddRemoveNotification.childType)) == 4, "MIDIObjectAddRemoveNotification.childType has unexpected size % instead of 4", size_of(type_of(MIDIObjectAddRemoveNotification.childType)));
+    assert(size_of(MIDIObjectAddRemoveNotification) == 24, "MIDIObjectAddRemoveNotification has size % instead of 24", size_of(MIDIObjectAddRemoveNotification));
+}
 
 MIDIObjectPropertyChangeNotification :: struct {
     messageID:    MIDINotificationMessageID;
@@ -183,12 +263,38 @@ MIDIObjectPropertyChangeNotification :: struct {
     objectType:   MIDIObjectType;
     propertyName: CFStringRef;
 }
+#run {
+    instance: MIDIObjectPropertyChangeNotification;
+    assert(((cast(*void)(*instance.messageID)) - cast(*void)(*instance)) == 0, "MIDIObjectPropertyChangeNotification.messageID has unexpected offset % instead of 0", ((cast(*void)(*instance.messageID)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectPropertyChangeNotification.messageID)) == 4, "MIDIObjectPropertyChangeNotification.messageID has unexpected size % instead of 4", size_of(type_of(MIDIObjectPropertyChangeNotification.messageID)));
+    assert(((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)) == 4, "MIDIObjectPropertyChangeNotification.messageSize has unexpected offset % instead of 4", ((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectPropertyChangeNotification.messageSize)) == 4, "MIDIObjectPropertyChangeNotification.messageSize has unexpected size % instead of 4", size_of(type_of(MIDIObjectPropertyChangeNotification.messageSize)));
+    assert(((cast(*void)(*instance.object)) - cast(*void)(*instance)) == 8, "MIDIObjectPropertyChangeNotification.object has unexpected offset % instead of 8", ((cast(*void)(*instance.object)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectPropertyChangeNotification.object)) == 4, "MIDIObjectPropertyChangeNotification.object has unexpected size % instead of 4", size_of(type_of(MIDIObjectPropertyChangeNotification.object)));
+    assert(((cast(*void)(*instance.objectType)) - cast(*void)(*instance)) == 12, "MIDIObjectPropertyChangeNotification.objectType has unexpected offset % instead of 12", ((cast(*void)(*instance.objectType)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectPropertyChangeNotification.objectType)) == 4, "MIDIObjectPropertyChangeNotification.objectType has unexpected size % instead of 4", size_of(type_of(MIDIObjectPropertyChangeNotification.objectType)));
+    assert(((cast(*void)(*instance.propertyName)) - cast(*void)(*instance)) == 16, "MIDIObjectPropertyChangeNotification.propertyName has unexpected offset % instead of 16", ((cast(*void)(*instance.propertyName)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIObjectPropertyChangeNotification.propertyName)) == 8, "MIDIObjectPropertyChangeNotification.propertyName has unexpected size % instead of 8", size_of(type_of(MIDIObjectPropertyChangeNotification.propertyName)));
+    assert(size_of(MIDIObjectPropertyChangeNotification) == 24, "MIDIObjectPropertyChangeNotification has size % instead of 24", size_of(MIDIObjectPropertyChangeNotification));
+}
 
 MIDIIOErrorNotification :: struct {
     messageID:    MIDINotificationMessageID;
     messageSize:  u32;
     driverDevice: MIDIDeviceRef;
     errorCode:    OSStatus;
+}
+#run {
+    instance: MIDIIOErrorNotification;
+    assert(((cast(*void)(*instance.messageID)) - cast(*void)(*instance)) == 0, "MIDIIOErrorNotification.messageID has unexpected offset % instead of 0", ((cast(*void)(*instance.messageID)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIIOErrorNotification.messageID)) == 4, "MIDIIOErrorNotification.messageID has unexpected size % instead of 4", size_of(type_of(MIDIIOErrorNotification.messageID)));
+    assert(((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)) == 4, "MIDIIOErrorNotification.messageSize has unexpected offset % instead of 4", ((cast(*void)(*instance.messageSize)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIIOErrorNotification.messageSize)) == 4, "MIDIIOErrorNotification.messageSize has unexpected size % instead of 4", size_of(type_of(MIDIIOErrorNotification.messageSize)));
+    assert(((cast(*void)(*instance.driverDevice)) - cast(*void)(*instance)) == 8, "MIDIIOErrorNotification.driverDevice has unexpected offset % instead of 8", ((cast(*void)(*instance.driverDevice)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIIOErrorNotification.driverDevice)) == 4, "MIDIIOErrorNotification.driverDevice has unexpected size % instead of 4", size_of(type_of(MIDIIOErrorNotification.driverDevice)));
+    assert(((cast(*void)(*instance.errorCode)) - cast(*void)(*instance)) == 12, "MIDIIOErrorNotification.errorCode has unexpected offset % instead of 12", ((cast(*void)(*instance.errorCode)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIIOErrorNotification.errorCode)) == 4, "MIDIIOErrorNotification.errorCode has unexpected size % instead of 4", size_of(type_of(MIDIIOErrorNotification.errorCode)));
+    assert(size_of(MIDIIOErrorNotification) == 16, "MIDIIOErrorNotification has size % instead of 16", size_of(MIDIIOErrorNotification));
 }
 
 kMIDIPropertyName: CFStringRef #elsewhere coremidi;
@@ -438,6 +544,12 @@ MIDIThruConnectionRef :: MIDIObjectRef;
 MIDIValueMap :: struct {
     value: [128] u8;
 }
+#run {
+    instance: MIDIValueMap;
+    assert(((cast(*void)(*instance.value)) - cast(*void)(*instance)) == 0, "MIDIValueMap.value has unexpected offset % instead of 0", ((cast(*void)(*instance.value)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIValueMap.value)) == 128, "MIDIValueMap.value has unexpected size % instead of 128", size_of(type_of(MIDIValueMap.value)));
+    assert(size_of(MIDIValueMap) == 128, "MIDIValueMap has size % instead of 128", size_of(MIDIValueMap));
+}
 
 MIDITransformType :: u16;
 kMIDITransform :: enum u32 {
@@ -485,6 +597,14 @@ MIDITransform :: struct {
     transform: MIDITransformType;
     param:     s16;
 }
+#run {
+    instance: MIDITransform;
+    assert(((cast(*void)(*instance.transform)) - cast(*void)(*instance)) == 0, "MIDITransform.transform has unexpected offset % instead of 0", ((cast(*void)(*instance.transform)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDITransform.transform)) == 2, "MIDITransform.transform has unexpected size % instead of 2", size_of(type_of(MIDITransform.transform)));
+    assert(((cast(*void)(*instance.param)) - cast(*void)(*instance)) == 2, "MIDITransform.param has unexpected offset % instead of 2", ((cast(*void)(*instance.param)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDITransform.param)) == 2, "MIDITransform.param has unexpected size % instead of 2", size_of(type_of(MIDITransform.param)));
+    assert(size_of(MIDITransform) == 4, "MIDITransform has size % instead of 4", size_of(MIDITransform));
+}
 
 MIDIControlTransform :: struct {
     controlType:         MIDITransformControlType;
@@ -493,10 +613,32 @@ MIDIControlTransform :: struct {
     transform:           MIDITransformType;
     param:               s16;
 }
+#run {
+    instance: MIDIControlTransform;
+    assert(((cast(*void)(*instance.controlType)) - cast(*void)(*instance)) == 0, "MIDIControlTransform.controlType has unexpected offset % instead of 0", ((cast(*void)(*instance.controlType)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIControlTransform.controlType)) == 1, "MIDIControlTransform.controlType has unexpected size % instead of 1", size_of(type_of(MIDIControlTransform.controlType)));
+    assert(((cast(*void)(*instance.remappedControlType)) - cast(*void)(*instance)) == 1, "MIDIControlTransform.remappedControlType has unexpected offset % instead of 1", ((cast(*void)(*instance.remappedControlType)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIControlTransform.remappedControlType)) == 1, "MIDIControlTransform.remappedControlType has unexpected size % instead of 1", size_of(type_of(MIDIControlTransform.remappedControlType)));
+    assert(((cast(*void)(*instance.controlNumber)) - cast(*void)(*instance)) == 2, "MIDIControlTransform.controlNumber has unexpected offset % instead of 2", ((cast(*void)(*instance.controlNumber)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIControlTransform.controlNumber)) == 2, "MIDIControlTransform.controlNumber has unexpected size % instead of 2", size_of(type_of(MIDIControlTransform.controlNumber)));
+    assert(((cast(*void)(*instance.transform)) - cast(*void)(*instance)) == 4, "MIDIControlTransform.transform has unexpected offset % instead of 4", ((cast(*void)(*instance.transform)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIControlTransform.transform)) == 2, "MIDIControlTransform.transform has unexpected size % instead of 2", size_of(type_of(MIDIControlTransform.transform)));
+    assert(((cast(*void)(*instance.param)) - cast(*void)(*instance)) == 6, "MIDIControlTransform.param has unexpected offset % instead of 6", ((cast(*void)(*instance.param)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIControlTransform.param)) == 2, "MIDIControlTransform.param has unexpected size % instead of 2", size_of(type_of(MIDIControlTransform.param)));
+    assert(size_of(MIDIControlTransform) == 8, "MIDIControlTransform has size % instead of 8", size_of(MIDIControlTransform));
+}
 
 MIDIThruConnectionEndpoint :: struct {
     endpointRef: MIDIEndpointRef;
     uniqueID:    MIDIUniqueID;
+}
+#run {
+    instance: MIDIThruConnectionEndpoint;
+    assert(((cast(*void)(*instance.endpointRef)) - cast(*void)(*instance)) == 0, "MIDIThruConnectionEndpoint.endpointRef has unexpected offset % instead of 0", ((cast(*void)(*instance.endpointRef)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionEndpoint.endpointRef)) == 4, "MIDIThruConnectionEndpoint.endpointRef has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionEndpoint.endpointRef)));
+    assert(((cast(*void)(*instance.uniqueID)) - cast(*void)(*instance)) == 4, "MIDIThruConnectionEndpoint.uniqueID has unexpected offset % instead of 4", ((cast(*void)(*instance.uniqueID)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionEndpoint.uniqueID)) == 4, "MIDIThruConnectionEndpoint.uniqueID has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionEndpoint.uniqueID)));
+    assert(size_of(MIDIThruConnectionEndpoint) == 8, "MIDIThruConnectionEndpoint has size % instead of 8", size_of(MIDIThruConnectionEndpoint));
 }
 
 MIDIThruConnectionParams :: struct {
@@ -529,6 +671,60 @@ MIDIThruConnectionParams :: struct {
     numMaps:              u16;
     reserved3:            [4] u16;
 }
+#run {
+    instance: MIDIThruConnectionParams;
+    assert(((cast(*void)(*instance.version)) - cast(*void)(*instance)) == 0, "MIDIThruConnectionParams.version has unexpected offset % instead of 0", ((cast(*void)(*instance.version)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.version)) == 4, "MIDIThruConnectionParams.version has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.version)));
+    assert(((cast(*void)(*instance.numSources)) - cast(*void)(*instance)) == 4, "MIDIThruConnectionParams.numSources has unexpected offset % instead of 4", ((cast(*void)(*instance.numSources)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.numSources)) == 4, "MIDIThruConnectionParams.numSources has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.numSources)));
+    assert(((cast(*void)(*instance.sources)) - cast(*void)(*instance)) == 8, "MIDIThruConnectionParams.sources has unexpected offset % instead of 8", ((cast(*void)(*instance.sources)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.sources)) == 64, "MIDIThruConnectionParams.sources has unexpected size % instead of 64", size_of(type_of(MIDIThruConnectionParams.sources)));
+    assert(((cast(*void)(*instance.numDestinations)) - cast(*void)(*instance)) == 72, "MIDIThruConnectionParams.numDestinations has unexpected offset % instead of 72", ((cast(*void)(*instance.numDestinations)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.numDestinations)) == 4, "MIDIThruConnectionParams.numDestinations has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.numDestinations)));
+    assert(((cast(*void)(*instance.destinations)) - cast(*void)(*instance)) == 76, "MIDIThruConnectionParams.destinations has unexpected offset % instead of 76", ((cast(*void)(*instance.destinations)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.destinations)) == 64, "MIDIThruConnectionParams.destinations has unexpected size % instead of 64", size_of(type_of(MIDIThruConnectionParams.destinations)));
+    assert(((cast(*void)(*instance.channelMap)) - cast(*void)(*instance)) == 140, "MIDIThruConnectionParams.channelMap has unexpected offset % instead of 140", ((cast(*void)(*instance.channelMap)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.channelMap)) == 16, "MIDIThruConnectionParams.channelMap has unexpected size % instead of 16", size_of(type_of(MIDIThruConnectionParams.channelMap)));
+    assert(((cast(*void)(*instance.lowVelocity)) - cast(*void)(*instance)) == 156, "MIDIThruConnectionParams.lowVelocity has unexpected offset % instead of 156", ((cast(*void)(*instance.lowVelocity)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.lowVelocity)) == 1, "MIDIThruConnectionParams.lowVelocity has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.lowVelocity)));
+    assert(((cast(*void)(*instance.highVelocity)) - cast(*void)(*instance)) == 157, "MIDIThruConnectionParams.highVelocity has unexpected offset % instead of 157", ((cast(*void)(*instance.highVelocity)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.highVelocity)) == 1, "MIDIThruConnectionParams.highVelocity has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.highVelocity)));
+    assert(((cast(*void)(*instance.lowNote)) - cast(*void)(*instance)) == 158, "MIDIThruConnectionParams.lowNote has unexpected offset % instead of 158", ((cast(*void)(*instance.lowNote)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.lowNote)) == 1, "MIDIThruConnectionParams.lowNote has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.lowNote)));
+    assert(((cast(*void)(*instance.highNote)) - cast(*void)(*instance)) == 159, "MIDIThruConnectionParams.highNote has unexpected offset % instead of 159", ((cast(*void)(*instance.highNote)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.highNote)) == 1, "MIDIThruConnectionParams.highNote has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.highNote)));
+    assert(((cast(*void)(*instance.noteNumber)) - cast(*void)(*instance)) == 160, "MIDIThruConnectionParams.noteNumber has unexpected offset % instead of 160", ((cast(*void)(*instance.noteNumber)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.noteNumber)) == 4, "MIDIThruConnectionParams.noteNumber has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.noteNumber)));
+    assert(((cast(*void)(*instance.velocity)) - cast(*void)(*instance)) == 164, "MIDIThruConnectionParams.velocity has unexpected offset % instead of 164", ((cast(*void)(*instance.velocity)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.velocity)) == 4, "MIDIThruConnectionParams.velocity has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.velocity)));
+    assert(((cast(*void)(*instance.keyPressure)) - cast(*void)(*instance)) == 168, "MIDIThruConnectionParams.keyPressure has unexpected offset % instead of 168", ((cast(*void)(*instance.keyPressure)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.keyPressure)) == 4, "MIDIThruConnectionParams.keyPressure has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.keyPressure)));
+    assert(((cast(*void)(*instance.channelPressure)) - cast(*void)(*instance)) == 172, "MIDIThruConnectionParams.channelPressure has unexpected offset % instead of 172", ((cast(*void)(*instance.channelPressure)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.channelPressure)) == 4, "MIDIThruConnectionParams.channelPressure has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.channelPressure)));
+    assert(((cast(*void)(*instance.programChange)) - cast(*void)(*instance)) == 176, "MIDIThruConnectionParams.programChange has unexpected offset % instead of 176", ((cast(*void)(*instance.programChange)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.programChange)) == 4, "MIDIThruConnectionParams.programChange has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.programChange)));
+    assert(((cast(*void)(*instance.pitchBend)) - cast(*void)(*instance)) == 180, "MIDIThruConnectionParams.pitchBend has unexpected offset % instead of 180", ((cast(*void)(*instance.pitchBend)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.pitchBend)) == 4, "MIDIThruConnectionParams.pitchBend has unexpected size % instead of 4", size_of(type_of(MIDIThruConnectionParams.pitchBend)));
+    assert(((cast(*void)(*instance.filterOutSysEx)) - cast(*void)(*instance)) == 184, "MIDIThruConnectionParams.filterOutSysEx has unexpected offset % instead of 184", ((cast(*void)(*instance.filterOutSysEx)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.filterOutSysEx)) == 1, "MIDIThruConnectionParams.filterOutSysEx has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.filterOutSysEx)));
+    assert(((cast(*void)(*instance.filterOutMTC)) - cast(*void)(*instance)) == 185, "MIDIThruConnectionParams.filterOutMTC has unexpected offset % instead of 185", ((cast(*void)(*instance.filterOutMTC)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.filterOutMTC)) == 1, "MIDIThruConnectionParams.filterOutMTC has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.filterOutMTC)));
+    assert(((cast(*void)(*instance.filterOutBeatClock)) - cast(*void)(*instance)) == 186, "MIDIThruConnectionParams.filterOutBeatClock has unexpected offset % instead of 186", ((cast(*void)(*instance.filterOutBeatClock)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.filterOutBeatClock)) == 1, "MIDIThruConnectionParams.filterOutBeatClock has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.filterOutBeatClock)));
+    assert(((cast(*void)(*instance.filterOutTuneRequest)) - cast(*void)(*instance)) == 187, "MIDIThruConnectionParams.filterOutTuneRequest has unexpected offset % instead of 187", ((cast(*void)(*instance.filterOutTuneRequest)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.filterOutTuneRequest)) == 1, "MIDIThruConnectionParams.filterOutTuneRequest has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.filterOutTuneRequest)));
+    assert(((cast(*void)(*instance.reserved2)) - cast(*void)(*instance)) == 188, "MIDIThruConnectionParams.reserved2 has unexpected offset % instead of 188", ((cast(*void)(*instance.reserved2)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.reserved2)) == 3, "MIDIThruConnectionParams.reserved2 has unexpected size % instead of 3", size_of(type_of(MIDIThruConnectionParams.reserved2)));
+    assert(((cast(*void)(*instance.filterOutAllControls)) - cast(*void)(*instance)) == 191, "MIDIThruConnectionParams.filterOutAllControls has unexpected offset % instead of 191", ((cast(*void)(*instance.filterOutAllControls)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.filterOutAllControls)) == 1, "MIDIThruConnectionParams.filterOutAllControls has unexpected size % instead of 1", size_of(type_of(MIDIThruConnectionParams.filterOutAllControls)));
+    assert(((cast(*void)(*instance.numControlTransforms)) - cast(*void)(*instance)) == 192, "MIDIThruConnectionParams.numControlTransforms has unexpected offset % instead of 192", ((cast(*void)(*instance.numControlTransforms)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.numControlTransforms)) == 2, "MIDIThruConnectionParams.numControlTransforms has unexpected size % instead of 2", size_of(type_of(MIDIThruConnectionParams.numControlTransforms)));
+    assert(((cast(*void)(*instance.numMaps)) - cast(*void)(*instance)) == 194, "MIDIThruConnectionParams.numMaps has unexpected offset % instead of 194", ((cast(*void)(*instance.numMaps)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.numMaps)) == 2, "MIDIThruConnectionParams.numMaps has unexpected size % instead of 2", size_of(type_of(MIDIThruConnectionParams.numMaps)));
+    assert(((cast(*void)(*instance.reserved3)) - cast(*void)(*instance)) == 196, "MIDIThruConnectionParams.reserved3 has unexpected offset % instead of 196", ((cast(*void)(*instance.reserved3)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIThruConnectionParams.reserved3)) == 8, "MIDIThruConnectionParams.reserved3 has unexpected size % instead of 8", size_of(type_of(MIDIThruConnectionParams.reserved3)));
+    assert(size_of(MIDIThruConnectionParams) == 204, "MIDIThruConnectionParams has size % instead of 204", size_of(MIDIThruConnectionParams));
+}
 
 MIDIThruConnectionParamsInitialize :: (inConnectionParams: *MIDIThruConnectionParams) -> void #foreign coremidi;
 
@@ -541,61 +737,6 @@ MIDIThruConnectionGetParams :: (connection: MIDIThruConnectionRef, outConnection
 MIDIThruConnectionSetParams :: (connection: MIDIThruConnectionRef, inConnectionParams: CFDataRef) -> OSStatus #foreign coremidi;
 
 MIDIThruConnectionFind :: (inPersistentOwnerID: CFStringRef, outConnectionList: *CFDataRef) -> OSStatus #foreign coremidi;
-
-MIDIDriverRef :: **MIDIDriverInterface;
-
-MIDIDeviceListRef :: MIDIObjectRef;
-
-MIDIDriverInterface :: struct {
-    _reserved:      *void;
-    QueryInterface: #type (thisPointer: *void, iid: REFIID, ppv: **void) -> HRESULT #c_call;
-    AddRef:         #type (thisPointer: *void) -> u32 #c_call;
-    Release:        #type (thisPointer: *void) -> u32 #c_call;
-
-    FindDevices:    #type (self: MIDIDriverRef, devList: MIDIDeviceListRef) -> OSStatus #c_call;
-
-    Start:          #type (self: MIDIDriverRef, devList: MIDIDeviceListRef) -> OSStatus #c_call;
-
-    Stop:           #type (self: MIDIDriverRef) -> OSStatus #c_call;
-
-    Configure:      #type (self: MIDIDriverRef, device: MIDIDeviceRef) -> OSStatus #c_call;
-
-    Send:           #type (self: MIDIDriverRef, pktlist: *MIDIPacketList, destRefCon1: *void, destRefCon2: *void) -> OSStatus #c_call;
-
-    EnableSource:   #type (self: MIDIDriverRef, src: MIDIEndpointRef, enabled: Boolean) -> OSStatus #c_call;
-
-    Flush:          #type (self: MIDIDriverRef, dest: MIDIEndpointRef, destRefCon1: *void, destRefCon2: *void) -> OSStatus #c_call;
-
-    Monitor:        #type (self: MIDIDriverRef, dest: MIDIEndpointRef, pktlist: *MIDIPacketList) -> OSStatus #c_call;
-
-    SendPackets:    #type (self: MIDIDriverRef, pktlist: *MIDIEventList, destRefCon1: *void, destRefCon2: *void) -> OSStatus #c_call;
-
-    MonitorEvents:  #type (self: MIDIDriverRef, dest: MIDIEndpointRef, pktlist: *MIDIEventList) -> OSStatus #c_call;
-}
-
-kMIDIDriverPropertyUsesSerial: CFStringRef #elsewhere coremidi;
-
-MIDIDeviceCreate :: (owner: MIDIDriverRef, name: CFStringRef, manufacturer: CFStringRef, model: CFStringRef, outDevice: *MIDIDeviceRef) -> OSStatus #foreign coremidi;
-
-MIDIDeviceDispose :: (device: MIDIDeviceRef) -> OSStatus #foreign coremidi;
-
-MIDIDeviceListGetNumberOfDevices :: (devList: MIDIDeviceListRef) -> ItemCount #foreign coremidi;
-
-MIDIDeviceListGetDevice :: (devList: MIDIDeviceListRef, index0: ItemCount) -> MIDIDeviceRef #foreign coremidi;
-
-MIDIDeviceListAddDevice :: (devList: MIDIDeviceListRef, dev: MIDIDeviceRef) -> OSStatus #foreign coremidi;
-
-MIDIDeviceListDispose :: (devList: MIDIDeviceListRef) -> OSStatus #foreign coremidi;
-
-MIDIEndpointSetRefCons :: (endpt: MIDIEndpointRef, ref1: *void, ref2: *void) -> OSStatus #foreign coremidi;
-
-MIDIEndpointGetRefCons :: (endpt: MIDIEndpointRef, ref1: **void, ref2: **void) -> OSStatus #foreign coremidi;
-
-MIDIGetDriverIORunLoop :: () -> CFRunLoopRef #foreign coremidi;
-
-MIDIGetDriverDeviceList :: (driver: MIDIDriverRef) -> MIDIDeviceListRef #foreign coremidi;
-
-MIDIDriverEnableMonitoring :: (driver: MIDIDriverRef, enabled: Boolean) -> OSStatus #foreign coremidi;
 
 MIDIMessageType :: u32;
 kMIDIMessageType :: enum u32 {
@@ -715,11 +856,29 @@ MIDIMessage_64 :: struct {
     word0: u32;
     word1: u32;
 }
+#run {
+    instance: MIDIMessage_64;
+    assert(((cast(*void)(*instance.word0)) - cast(*void)(*instance)) == 0, "MIDIMessage_64.word0 has unexpected offset % instead of 0", ((cast(*void)(*instance.word0)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_64.word0)) == 4, "MIDIMessage_64.word0 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_64.word0)));
+    assert(((cast(*void)(*instance.word1)) - cast(*void)(*instance)) == 4, "MIDIMessage_64.word1 has unexpected offset % instead of 4", ((cast(*void)(*instance.word1)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_64.word1)) == 4, "MIDIMessage_64.word1 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_64.word1)));
+    assert(size_of(MIDIMessage_64) == 8, "MIDIMessage_64 has size % instead of 8", size_of(MIDIMessage_64));
+}
 
 MIDIMessage_96 :: struct {
     word0: u32;
     word1: u32;
     word2: u32;
+}
+#run {
+    instance: MIDIMessage_96;
+    assert(((cast(*void)(*instance.word0)) - cast(*void)(*instance)) == 0, "MIDIMessage_96.word0 has unexpected offset % instead of 0", ((cast(*void)(*instance.word0)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_96.word0)) == 4, "MIDIMessage_96.word0 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_96.word0)));
+    assert(((cast(*void)(*instance.word1)) - cast(*void)(*instance)) == 4, "MIDIMessage_96.word1 has unexpected offset % instead of 4", ((cast(*void)(*instance.word1)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_96.word1)) == 4, "MIDIMessage_96.word1 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_96.word1)));
+    assert(((cast(*void)(*instance.word2)) - cast(*void)(*instance)) == 8, "MIDIMessage_96.word2 has unexpected offset % instead of 8", ((cast(*void)(*instance.word2)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_96.word2)) == 4, "MIDIMessage_96.word2 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_96.word2)));
+    assert(size_of(MIDIMessage_96) == 12, "MIDIMessage_96 has size % instead of 12", size_of(MIDIMessage_96));
 }
 
 MIDIMessage_128 :: struct {
@@ -728,8 +887,82 @@ MIDIMessage_128 :: struct {
     word2: u32;
     word3: u32;
 }
+#run {
+    instance: MIDIMessage_128;
+    assert(((cast(*void)(*instance.word0)) - cast(*void)(*instance)) == 0, "MIDIMessage_128.word0 has unexpected offset % instead of 0", ((cast(*void)(*instance.word0)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_128.word0)) == 4, "MIDIMessage_128.word0 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_128.word0)));
+    assert(((cast(*void)(*instance.word1)) - cast(*void)(*instance)) == 4, "MIDIMessage_128.word1 has unexpected offset % instead of 4", ((cast(*void)(*instance.word1)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_128.word1)) == 4, "MIDIMessage_128.word1 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_128.word1)));
+    assert(((cast(*void)(*instance.word2)) - cast(*void)(*instance)) == 8, "MIDIMessage_128.word2 has unexpected offset % instead of 8", ((cast(*void)(*instance.word2)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_128.word2)) == 4, "MIDIMessage_128.word2 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_128.word2)));
+    assert(((cast(*void)(*instance.word3)) - cast(*void)(*instance)) == 12, "MIDIMessage_128.word3 has unexpected offset % instead of 12", ((cast(*void)(*instance.word3)) - cast(*void)(*instance)));
+    assert(size_of(type_of(MIDIMessage_128.word3)) == 4, "MIDIMessage_128.word3 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_128.word3)));
+    assert(size_of(MIDIMessage_128) == 16, "MIDIMessage_128 has size % instead of 16", size_of(MIDIMessage_128));
+}
 
 #scope_file
 
+#import "Basic"; // For assert
+
 libc :: #system_library "libc";
 coremidi :: #system_library "CoreMIDI";
+
+#scope_export
+
+UTF32Char :: u32;
+ConstStringPtr :: *u8;
+StringPtr :: *u8;
+ConstStr255Param :: *u8;
+OSErr :: s16;
+LogicalAddress :: *void;
+ConstLogicalAddress :: *void;
+PhysicalAddress :: *void;
+BytePtr :: *u8;
+ByteCount :: u64;
+ByteOffset :: u64;
+Duration :: s32;
+OptionBits :: u32;
+ItemCount :: u64;
+PBVersion :: u32;
+ScriptCode :: s16;
+LangCode :: s16;
+RegionCode :: s16;
+ResType :: FourCharCode;
+OSTypePtr :: *OSType;
+ResTypePtr :: *ResType;
+Boolean :: u8;
+dispatch_queue_t :: *struct{};
+
+// See Objective_C_Block_Basic in Objective-C. There are parts of the C API
+// that use blocks so it may be valuable to include that full definition here.
+Block :: *struct{};
+
+wide :: struct {
+    lo: u32;
+    hi: s32;
+}
+
+UnsignedWide :: struct {
+    lo: u32;
+    hi: u32;
+}
+
+Fixed :: s32;
+FixedPtr :: *Fixed;
+Fract :: s32;
+FractPtr :: *Fract;
+UnsignedFixed :: u32;
+UnsignedFixedPtr :: *UnsignedFixed;
+ShortFixed :: s16;
+ShortFixedPtr :: *ShortFixed;
+
+Float32 :: float;
+Float64 :: float64;
+
+Byte :: u8;
+SignedByte :: s8;
+WidePtr :: *wide;
+UnsignedWidePtr :: *UnsignedWide;
+
+#import "macos";
+

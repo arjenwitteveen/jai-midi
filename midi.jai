@@ -2,6 +2,8 @@
     #load "windows.jai";
 } else #if OS == .LINUX {
     #load "linux.jai";
+} else #if OS == .MACOS {
+    #load "macos.jai";
 } else {
     #assert false "The current operating system is not supported yet.";
 }
@@ -55,6 +57,34 @@ MIDI_Decoder :: struct {
     running_status: u8;
     message_buffer: [..] u8;
     message_in_progress: bool;
+}
+
+get_source_index_by_name :: (name: string, match_full_name := false) -> int {
+    auto_release_temp();
+    result := -1;
+    sources := get_number_of_sources();
+    for 0..sources - 1 {
+        source_name := get_source_name(it);
+        if (!match_full_name && contains(source_name, name)) || source_name == name {
+            result = it;
+            break;
+        }
+    }
+    return result;
+}
+
+get_destination_index_by_name :: (name: string, match_full_name := false) -> int {
+    auto_release_temp();
+    result := -1;
+    destinations := get_number_of_destinations();
+    for 0..destinations - 1 {
+        destination_name := get_destination_name(it);
+        if (!match_full_name && contains(destination_name, name)) || destination_name == name {
+            result = it;
+            break;
+        }
+    }
+    return result;
 }
 
 create_midi_message :: (bytes: [] u8) -> MIDI_Message, bool {
