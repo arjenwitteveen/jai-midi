@@ -171,6 +171,7 @@ endpoint_info_test :: () {
         assert(source_name.count > 0, "Source name could not be retrieved.");
         info, info_success := get_source_info(it);
         assert(info_success, "Source info could not be retrieved.");
+        // print("%\n", info);
     }
 
     number_of_destinations := get_number_of_destinations();
@@ -179,7 +180,8 @@ endpoint_info_test :: () {
         destination_name := get_destination_name(it);
         assert(destination_name.count > 0, "Destination name could not be retrieved.");
         info, info_success := get_destination_info(it);
-        assert(info_success, "Source info could not be retrieved.");
+        assert(info_success, "Destination info could not be retrieved.");
+        // print("%\n", info);
     }
 
     // Error handling; these are supposed to trigger some error messages, but no crashes.

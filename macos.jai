@@ -6,6 +6,18 @@ get_number_of_destinations :: () -> int {
     return cast(int) MIDIGetNumberOfDestinations();
 }
 
+get_source_info :: (index: int) -> MIDI_Source_Info, bool {
+    endpoint := MIDIGetSource(cast(u32) index);
+    endpoint_info, success := get_endpoint_info(endpoint);
+    return xx endpoint_info, success;
+}
+
+get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
+    endpoint := MIDIGetDestination(cast(u32) index);
+    endpoint_info, success := get_endpoint_info(endpoint);
+    return xx endpoint_info, success;
+}
+
 get_source_name :: (index: int) -> string {
     endpoint := MIDIGetSource(cast(u32) index);
 
@@ -149,7 +161,54 @@ MIDI_Output_Platform_Data :: struct {
     time_base: u64;
 }
 
+MIDI_Source_Info :: MIDI_Endpoint_Info;
+MIDI_Destination_Info :: MIDI_Endpoint_Info;
+
 #scope_file
+
+MIDI_Endpoint_Info :: struct {
+    name: string;
+    display_name: string;
+    model: string;
+    manufacturer: string;
+    icon_path: string;
+    driver_owner: string;
+    driver_version: int;
+}
+
+get_endpoint_info :: (endpoint: MIDIEndpointRef) -> MIDI_Endpoint_Info, bool {
+    result: MIDI_Endpoint_Info;
+    if !endpoint  return result, false;
+
+    success := true;
+
+    get_string_property :: (property: CFStringRef) -> string #expand {
+        value: CFStringRef;
+        status := MIDIObjectGetStringProperty(endpoint, property, *value);
+        if status == 0  return to_string(value);
+        return "";
+    }
+
+    get_integer_property :: (property: CFStringRef) -> int #expand {
+        value: s32;
+        status := MIDIObjectGetIntegerProperty(endpoint, property, *value);
+        if status == 0  return value;
+        return 0;
+    }
+
+    result.name = get_string_property(kMIDIPropertyName);
+    result.display_name = get_string_property(kMIDIPropertyDisplayName);
+    result.model = get_string_property(kMIDIPropertyModel);
+    result.manufacturer = get_string_property(kMIDIPropertyManufacturer);
+    result.icon_path = get_string_property(kMIDIPropertyImage);
+    result.driver_owner = get_string_property(kMIDIPropertyDriverOwner);
+    result.driver_version = get_integer_property(kMIDIPropertyDriverVersion);
+
+    // @Incomplete: We could get way more property values here, although I feel a lot of them are either not relevant,
+    // or not filled out consistently.
+
+    return result, success;
+}
 
 core_midi_client: MIDIClientRef;
 input_port: MIDIPortRef;

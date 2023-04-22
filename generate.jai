@@ -219,7 +219,6 @@ ResType :: FourCharCode;
 OSTypePtr :: *OSType;
 ResTypePtr :: *ResType;
 Boolean :: u8;
-dispatch_queue_t :: *struct{};
 
 // See Objective_C_Block_Basic in Objective-C. There are parts of the C API
 // that use blocks so it may be valuable to include that full definition here.

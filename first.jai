@@ -4,18 +4,22 @@
 
 EXAMPLES_PATH :: "examples";
 
+print_help_message :: () {
+    print("Usage: jai first.jai - <command>\n\n");
+    print("Commands:\n");
+    print("  test      Run test suite.\n");
+    print("  examples  Build all examples.\n");
+    print("  clean     Clean build artifacts for examples.\n");
+    print("  generate  Generate bindings for the current OS.\n");
+}
+
 #run {
     args := get_build_options().compile_time_command_line;
     set_build_options_dc(.{do_output=false});
 	options := get_build_options();
 
     if args.count == 0 {
-        print("Usage: jai first.jai - <command>\n\n");
-        print("Commands:\n");
-        print("  test      Run test suite.\n");
-        print("  examples  Build all examples.\n");
-        print("  clean     Clean build artifacts for examples.\n");
-        print("  generate  Generate bindings for the current OS.\n");
+        print_help_message();
         return;
     }
 
@@ -24,6 +28,9 @@ EXAMPLES_PATH :: "examples";
         case "examples";  do_examples(build = true, clean = false);
         case "clean";     do_examples(build = false, clean = true);
         case "generate";  do_bindings();
+        case;
+        print("Unknown command '%'.\n\n", args[0]);
+        print_help_message();
     }
 }
 
