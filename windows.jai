@@ -339,4 +339,4 @@ _error :: (result: MMRESULT, message: string = "", $midi_in: bool) -> bool {
     return false;
 }
 
-#load "bindings_windows.jai";
+#load "bindings/windows.jai";

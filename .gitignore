@@ -2,5 +2,6 @@
 .build/
 build/
 midi_files/
+xcode/
 *.exe
 *.pdb

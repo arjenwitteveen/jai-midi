@@ -261,5 +261,5 @@ mach_timestamp_to_apollo_time :: (timestamp: u64) -> Apollo_Time #expand {
     return milliseconds_to_apollo(cast(s64) time_milliseconds);
 }
 
-#load "bindings_macos.jai";
+#load "bindings/macos.jai";
 #import "Objective_C";
