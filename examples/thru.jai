@@ -32,9 +32,8 @@ midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Ap
 }
 
 main :: () {
-    // source_name :: "Keystation";
-    source_name :: "Impulse";
-    destination_name :: "Synth";
+    source_name :: "Keystation";
+    destination_name :: "Massive";
 
     source_index  := get_source_index_by_name(source_name);
     destination_index := get_destination_index_by_name(destination_name);

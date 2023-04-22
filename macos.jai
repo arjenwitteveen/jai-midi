@@ -17,8 +17,6 @@
    };
 */
 
-TARGET_MACOS_11_PLUS :: true;
-
 get_number_of_sources :: () -> int {
     return cast(int) MIDIGetNumberOfSources();
 }
@@ -53,23 +51,27 @@ get_destination_name :: (index: int) -> string {
     return "";
 }
 
-open_input :: (index: int, callback: MIDI_Input_Callback = null, user_data: *void = null) -> *MIDI_Input #must {
+open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
     ensure_client(); // @TODO: Check result;
 
-    input := New(MIDI_Input);
-
-    input._input_block.isa = xx _NSConcreteGlobalBlock;
-    input._input_block.invoke = xx midi_input_block;
-    input._input_block.descriptor = *input._input_block_descriptor;
-    input._input_block_descriptor.size = size_of(Objective_C_Block_Basic);
-
-    #if TARGET_MACOS_11_PLUS {
-        input_name := make_cf_string("input");
-        result := MIDIDestinationCreateWithProtocol(core_midi_client, input_name, xx kMIDIProtocol._1_0, *input.handle, xx *input._input_block);
-    } else {
-        #assert false "macOS < 11 is not supported.";
-        // result := MIDIDestinationCreate(core_midi_client, CFSTR("default"), *output.handle);
+    source_endpoint := MIDIGetSource(xx source_index);
+    if !source_endpoint {
+        log_error("Cannot open MIDI output with source %.", source_endpoint);
+        return null;
     }
+
+    input := New(MIDI_Input);
+    input.index = source_index;
+    input.callback = callback;
+    input.callback_data = user_data;
+    input.source_endpoint = source_endpoint;
+    input.time_base = mach_absolute_time();
+
+    result := MIDIPortConnectSource(input_port, input.source_endpoint, cast(*void) input);
+    assert(result == 0, "Error in MIDIPortConnectSource (%)", result);
+
+    // input_name := make_cf_string("input");
+    // result := MIDIDestinationCreateWithProtocol(core_midi_client, input_name, xx kMIDIProtocol._1_0, *input.handle, xx *input._input_block);
 
     if result {
         free(input);
@@ -81,7 +83,7 @@ open_input :: (index: int, callback: MIDI_Input_Callback = null, user_data: *voi
 
 close_input :: (input: *MIDI_Input) {
     if input {
-        result := MIDIEndpointDispose(input.handle);
+        MIDIPortDisconnectSource(input_port, input.source_endpoint);
         free(input);
     }
 }
@@ -96,32 +98,16 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
     }
 
     output := New(MIDI_Output);
+    output.index = destination_index;
     output.destination_endpoint = destination_endpoint;
-
-    #if TARGET_MACOS_11_PLUS {
-        output_name := make_cf_string("output");
-        result := MIDISourceCreateWithProtocol(core_midi_client, output_name, xx kMIDIProtocol._1_0, *output.handle);
-        assert(result == 0);
-
-        output_port_name := make_cf_string("output_port");
-        result = MIDIOutputPortCreate(core_midi_client, output_port_name, *output.port);
-        assert(result == 0);
-    } else {
-        #assert false "macOS < 11 is not supported.";
-        // result := MIDISourceCreate(core_midi_client, CFSTR("default"), *output.handle);
-    }
-
-    if result {
-        free(output);
-        return null;
-    }
+    output.time_base = mach_absolute_time();
 
     return output;
 }
 
 close_output :: (output: *MIDI_Output, reset_all_notes := false) {
     if output {
-        result := MIDIEndpointDispose(output.handle);
+        // result := MIDIEndpointDispose(output.handle);
         free(output);
     }
 }
@@ -129,7 +115,7 @@ close_output :: (output: *MIDI_Output, reset_all_notes := false) {
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     if get_status(message[0]) == .System_Exclusive {
         request: MIDISysexSendRequest;
-        request.destination = output.handle;
+        request.destination = output.destination_endpoint;
 
         data_pointer := message.data;
         request.data = data_pointer;
@@ -147,22 +133,6 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
         return true;
     }
 
-    // packet_buffer: [256] u8;
-    // packet_list := cast(*MIDIPacketList) output.packet_buffer;
-    // packets := MIDIPacketListInit(output.packet_list);
-
-    // macOS 11+:
-    // event_list := cast(*MIDIReceivedEventList) output.packet_buffer;
-    // events := MIDIEventListInit(output.packet_list, kMIDIProtocol_1_0);
-    // next_packet := MIDIEventListAdd(event_list, event_buffer.count, events, timestamp, <word_count>, <word_pointer>);
-
-    // timestamp := mach_absolute_time();
-    // next_packet := MIDIPacketListAdd(packet_list, packet_buffer.count, packets, timestamp, number_of_bytes, bytes.data);
-    // assert(next_packet != null, "No space for packet.");
-
-    // result := MIDIReceived(output.handle, output.packet_list);
-
-    // macOS 11+:
     result: OSStatus;
 
     event_list: MIDIEventList;
@@ -171,20 +141,14 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     message_word_count := cast(u64) (align_forward(message.count, 4) / 4);
     assert(message_word_count == 1);
 
-    message_as_ump_word :: (group: u32, status_channel: u32, data1: u32, data2: u32) -> u32 #expand {
-        return (((0x2 << 4) | (group & 0xf)) << 24) | (status_channel << 16) | ((data1 & 0x7f) << 8) | (data2 & 0x7f);
-    }
-
     word := message_as_ump_word(0, message[0], message[1], ifx message.count > 2 then message[2] else 0);
-
-    // print("message = %\nword = 0x%\n", message, formatInt(word, base=16));
 
     packet = MIDIEventListAdd(*event_list, size_of(MIDIEventList), packet, 0 /* timestamp */, 1, *word);
     assert(packet != null);
 
     // send_result := MIDIReceivedEventList(output.handle, *event_list);
 
-    send_result := MIDISendEventList(output.port, output.destination_endpoint, *event_list);
+    send_result := MIDISendEventList(output_port, output.destination_endpoint, *event_list);
 
     if send_result {
         log_error("Error in MIDIReceivedEventList: %.", send_result);
@@ -194,51 +158,106 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
 }
 
 MIDI_Input_Platform_Data :: struct {
-    handle: MIDIEndpointRef;
-    callback_context: Context;
+    // callback_context: Context;
+    source_endpoint: MIDIEndpointRef;
 
-    _input_block_descriptor: Objective_C_Block_Basic_Descriptor;
-    _input_block: Objective_C_Block_Basic;
+    time_base: u64;
 }
 
 MIDI_Output_Platform_Data :: struct {
-    handle: MIDIEndpointRef;
-
-    port: MIDIPortRef;
     destination_endpoint: MIDIEndpointRef;
+
+    time_base: u64;
 }
 
 #scope_file
 
 core_midi_client: MIDIClientRef;
+input_port: MIDIPortRef;
+output_port: MIDIPortRef;
 
-midi_input_block :: (block: *Objective_C_Block_Basic, event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
+input_block_descriptor: Objective_C_Block_Basic_Descriptor;
+input_block: Objective_C_Block_Basic;
+
+mach_timebase: mach_timebase_info;
+
+midi_input_callback :: (block: *Objective_C_Block_Basic, event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
+    input := cast(*MIDI_Input)src_conn_ref_con;
+
     ctx: Context;
     push_context ctx {
-        debug_break();
-        print("Reached the input block!!!\n");
+        assert(event_list.protocol == xx kMIDIProtocol._1_0, "Received event list using an unsupported MIDI protocol.");
+        assert(input != null, "Invalid input pointer.");
+
+        packet := event_list.packet.data;
+
+        for 1..event_list.numPackets {
+            timestamp := mach_timestamp_to_apollo_time(packet.timeStamp - input.time_base);
+
+            for word_index: 0..packet.wordCount {
+                midi_event_bytes := ump_word_to_bytes(packet.words[word_index]);
+                message, message_ready := decode_midi_bytes(*input.decoder, midi_event_bytes);
+                if message_ready  post_message_to_input(input, message, timestamp);
+            }
+        }
     }
 }
 
-midi_input_callback :: (event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
-    new_context: Context;
-    push_context new_context {
+message_as_ump_word :: (group: u32, status_channel: u32, data1: u32, data2: u32) -> u32 #expand {
+    return (((0x2 << 4) | (group & 0xf)) << 24) | (status_channel << 16) | ((data1 & 0x7f) << 8) | (data2 & 0x7f);
+}
 
-    }
+ump_word_to_bytes :: (ump: u32) -> [3] u8 #expand {
+    result: [3] u8;
+    result[0] = cast(u8) ((ump >> 16) & 0xff);
+    result[1] = cast(u8) ((ump >> 8) & 0x7f);
+    result[2] = cast(u8) (ump & 0x7f);
+    return result;
 }
 
 // @Note: There is a MIDIClientDispose, but Apple advises not to call this explicitly; the system will dispose clients
-// automatically when the applicaton exits.
+// automatically when the applicaton exits. The same goes for ports.
 
 ensure_client :: () -> bool {
     if core_midi_client == 0 {
         init_objective_c();
-        cfstring := make_cf_string(CLIENT_NAME, false); // @Leak
-        // @TODO: Posisbly we should use MIDIClientCreateWithBlock
-        result := MIDIClientCreate(cfstring, null, null, *core_midi_client);
-        return result == 0;
+
+        // Initialize the client.
+        cfstring := make_cf_string(CLIENT_NAME, false);
+        result := MIDIClientCreate(cfstring, null, null, *core_midi_client); // @TODO: Posisbly we should use MIDIClientCreateWithBlock
+
+        success := result == 0;
+        
+        // Setup Objective-C blocks for the MIDI input callback.
+        input_block.isa = xx _NSConcreteGlobalBlock;
+        input_block.invoke = xx midi_input_callback;
+        input_block.descriptor = *input_block_descriptor;
+        input_block_descriptor.size = size_of(Objective_C_Block_Basic);
+
+        if result == 0 {
+            success &= init_input_port(*input_port);
+            success &= init_output_port(*output_port);
+        }
+
+        mach_timebase_info_(*mach_timebase);
+
+        return success;
     }
     return true;
+}
+
+init_input_port :: (port: *MIDIPortRef) -> bool {
+    port_name := make_cf_string("input_port");
+    result := MIDIInputPortCreateWithProtocol(core_midi_client, port_name, xx kMIDIProtocol._1_0, port, xx *input_block);
+    assert(result == 0, "Error in MIDIInputPortCreateWithProtocol (%)", result);
+    return result == 0;
+}
+
+init_output_port :: (port: *MIDIPortRef) -> bool {
+    port_name := make_cf_string("output_port");
+    result := MIDIOutputPortCreate(core_midi_client, port_name, port);
+    assert(result == 0, "Error in MIDIOutputPortCreate (%)", result);
+    return result == 0;
 }
 
 CFSTR :: (s: *u8) -> CFStringRef #expand {
@@ -255,6 +274,11 @@ make_cf_string :: ($defer_release := true) -> CFStringRef #expand {
     cfstring: CFStringRef;
     #if defer_release  `defer CFRelease(cfstring);
     return cfstring;
+}
+
+mach_timestamp_to_apollo_time :: (timestamp: u64) -> Apollo_Time #expand {
+    time_milliseconds := (timestamp * mach_timebase.numer) / (1_000_000 * mach_timebase.denom);
+    return milliseconds_to_apollo(cast(s64) time_milliseconds);
 }
 
 #load "bindings_macos.jai";

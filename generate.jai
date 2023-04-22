@@ -48,11 +48,11 @@ generate_bindings :: () -> bool {
             array_add(*system_include_paths, GENERATOR_DEFAULT_SYSTEM_INCLUDE_PATH);
             array_add(*system_include_paths, LIBC_PATH);
             array_add(*source_files,  tprint("%/CoreMIDI.h", COREMIDI_PATH));
+            array_add(*source_files,  tprint("%/mach/mach_time.h", LIBC_PATH));
             // array_add(*source_files,  tprint("%/MacTypes.h", LIBC_PATH));
             array_add(*path_fragments_to_treat_as_non_system_paths,
-                      // "MacTypes.h",
+                      "mach/mach_time.h",
                       "MIDICapabilityInquiry.h",
-                      // "MIDIDriver.h",
                       "MIDIMessages.h",
                       "MIDINetworkSession.h",
                       "MIDIServices.h",
@@ -190,7 +190,6 @@ ConstStringPtr :: *u8;
 StringPtr :: *u8;
 ConstStr255Param :: *u8;
 OSErr :: s16;
-OSStatus :: s32;
 LogicalAddress :: *void;
 ConstLogicalAddress :: *void;
 PhysicalAddress :: *void;
@@ -198,15 +197,12 @@ BytePtr :: *u8;
 ByteCount :: u64;
 ByteOffset :: u64;
 Duration :: s32;
-AbsoluteTime :: UnsignedWide;
 OptionBits :: u32;
 ItemCount :: u64;
 PBVersion :: u32;
 ScriptCode :: s16;
 LangCode :: s16;
 RegionCode :: s16;
-FourCharCode :: u32;
-OSType :: FourCharCode;
 ResType :: FourCharCode;
 OSTypePtr :: *OSType;
 ResTypePtr :: *ResType;

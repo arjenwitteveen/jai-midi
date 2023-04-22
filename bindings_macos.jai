@@ -160,7 +160,7 @@ MIDIPacket :: struct {
 
 MIDIPacketList :: struct {
     numPackets: u32;
-    packet:     [1] MIDIPacket;
+    packet:     [1] MIDIPacket #align 4;
 }
 #run {
     instance: MIDIPacketList;
@@ -899,6 +899,40 @@ MIDIMessage_128 :: struct {
     assert(size_of(type_of(MIDIMessage_128.word3)) == 4, "MIDIMessage_128.word3 has unexpected size % instead of 4", size_of(type_of(MIDIMessage_128.word3)));
     assert(size_of(MIDIMessage_128) == 16, "MIDIMessage_128 has size % instead of 16", size_of(MIDIMessage_128));
 }
+
+mach_timebase_info :: struct {
+    numer: u32;
+    denom: u32;
+}
+#run {
+    instance: mach_timebase_info;
+    assert(((cast(*void)(*instance.numer)) - cast(*void)(*instance)) == 0, "mach_timebase_info.numer has unexpected offset % instead of 0", ((cast(*void)(*instance.numer)) - cast(*void)(*instance)));
+    assert(size_of(type_of(mach_timebase_info.numer)) == 4, "mach_timebase_info.numer has unexpected size % instead of 4", size_of(type_of(mach_timebase_info.numer)));
+    assert(((cast(*void)(*instance.denom)) - cast(*void)(*instance)) == 4, "mach_timebase_info.denom has unexpected offset % instead of 4", ((cast(*void)(*instance.denom)) - cast(*void)(*instance)));
+    assert(size_of(type_of(mach_timebase_info.denom)) == 4, "mach_timebase_info.denom has unexpected size % instead of 4", size_of(type_of(mach_timebase_info.denom)));
+    assert(size_of(mach_timebase_info) == 8, "mach_timebase_info has size % instead of 8", size_of(mach_timebase_info));
+}
+
+mach_timebase_info_t :: *mach_timebase_info;
+mach_timebase_info_data_t :: mach_timebase_info;
+
+mach_timebase_info_ :: (info: mach_timebase_info_t) -> kern_return_t #foreign libc "mach_timebase_info";
+
+mach_wait_until :: (deadline: u64) -> kern_return_t #foreign libc;
+
+mach_absolute_time :: () -> u64 #foreign libc;
+
+mach_approximate_time :: () -> u64 #foreign libc;
+
+/*
+* like mach_absolute_time, but advances during sleep
+*/
+mach_continuous_time :: () -> u64 #foreign libc;
+
+/*
+* like mach_approximate_time, but advances during sleep
+*/
+mach_continuous_approximate_time :: () -> u64 #foreign libc;
 
 #scope_file
 

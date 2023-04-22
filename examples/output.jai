@@ -7,7 +7,8 @@ main :: () {
 
     // Change destination_name to (part of) the name of an available MIDI destination. On Windows, the current value
     // should match the default Microsoft GS Wavetable Synth, for example.
-    destination_name :: "Synth";
+    destination_name :: "Massive";
+    // destination_name :: "MIDI Monitor";
 
     destination_index := get_destination_index_by_name(destination_name, match_full_name = false);
     if destination_index >= 0 {
@@ -44,8 +45,8 @@ play_a_song :: (output: *MIDI_Output) {
             sleep_milliseconds(note_length);
         }
     }
-    send_midi_message(output, create_midi_message(.Note_On,  cast(u8) (root_note + relative_notes[3] - 12), 100));
-    send_midi_message(output, create_midi_message(.Note_Off, cast(u8) (root_note + relative_notes[3] - 12)));
+    send_midi_message(output, create_midi_message(.Note_On,  cast(u8) (root_note + relative_notes[relative_notes.count - 1] - 12), 100));
+    send_midi_message(output, create_midi_message(.Note_Off, cast(u8) (root_note + relative_notes[relative_notes.count - 1] - 12)));
     sleep_milliseconds(6 * note_length_milliseconds);
     send_midi_message(output, create_control_change_message(.Sustain_Pedal, 0x0));
     sleep_milliseconds(200);

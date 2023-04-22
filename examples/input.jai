@@ -10,7 +10,7 @@ main :: () {
     print("\n");
 
     // Change source_name to (part of) the name of an available MIDI source, like a MIDI keyboard.
-    source_name :: "Impulse";
+    source_name :: "Keystation";
     source_index := get_source_index_by_name(source_name, match_full_name = false);
 
     if source_index >= 0 {
