@@ -1,22 +1,3 @@
-/*
-   CoreMIDI structs
-   ================
-   Header folder:
-   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreMIDI.framework/Versions/A/Headers/
-   struct MIDIPacket // A collection of simultaneous MIDI events.
-   {
-       MIDITimeStamp timeStamp; // Normally can have 0 to mean 'now', but NOT when using MIDIReceived!
-       UInt16 length; // Length of valid MIDI bytes in data.
-       Byte data[256]; // Variable-length stream of MIDI messages. Running status not allowed! Messages must always be complete.
-                       // It is declared to be 256 bytes to handle simple situations.
-   };
-   struct MIDIPacketList
-   {
-       UInt32 numPackets; // Number of MIDIPackets in the list.
-       MIDIPacket packet[1]; // Open-ended array of variable-length MIDIPackets. Do not access directly.
-   };
-*/
-
 get_number_of_sources :: () -> int {
     return cast(int) MIDIGetNumberOfSources();
 }
@@ -52,7 +33,7 @@ get_destination_name :: (index: int) -> string {
 }
 
 open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
-    ensure_client(); // @TODO: Check result;
+    init_macos(); // @TODO: Check result;
 
     source_endpoint := MIDIGetSource(xx source_index);
     if !source_endpoint {
@@ -70,6 +51,8 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     result := MIDIPortConnectSource(input_port, input.source_endpoint, cast(*void) input);
     assert(result == 0, "Error in MIDIPortConnectSource (%)", result);
 
+    // @Note: This code is the version to use when you want to open an actual input that other clients can see. Maybe we
+    // can support that in the future, although not every OS will support this.
     // input_name := make_cf_string("input");
     // result := MIDIDestinationCreateWithProtocol(core_midi_client, input_name, xx kMIDIProtocol._1_0, *input.handle, xx *input._input_block);
 
@@ -89,7 +72,7 @@ close_input :: (input: *MIDI_Input) {
 }
 
 open_output :: (destination_index: int) -> *MIDI_Output #must {
-    ensure_client(); // @TODO: Check result;
+    init_macos(); // @TODO: Check result;
 
     destination_endpoint := MIDIGetDestination(xx destination_index);
     if !destination_endpoint {
@@ -107,7 +90,6 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
 
 close_output :: (output: *MIDI_Output, reset_all_notes := false) {
     if output {
-        // result := MIDIEndpointDispose(output.handle);
         free(output);
     }
 }
@@ -117,8 +99,7 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
         request: MIDISysexSendRequest;
         request.destination = output.destination_endpoint;
 
-        data_pointer := message.data;
-        request.data = data_pointer;
+        request.data = message.data;
         request.bytesToSend = xx message.count;
 
         err := MIDISendSysex(*request);
@@ -160,13 +141,11 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
 MIDI_Input_Platform_Data :: struct {
     // callback_context: Context;
     source_endpoint: MIDIEndpointRef;
-
     time_base: u64;
 }
 
 MIDI_Output_Platform_Data :: struct {
     destination_endpoint: MIDIEndpointRef;
-
     time_base: u64;
 }
 
@@ -215,10 +194,9 @@ ump_word_to_bytes :: (ump: u32) -> [3] u8 #expand {
     return result;
 }
 
-// @Note: There is a MIDIClientDispose, but Apple advises not to call this explicitly; the system will dispose clients
-// automatically when the applicaton exits. The same goes for ports.
+init_macos :: () -> bool {
+    // @Note: Apple advises not to dispose clients or ports explicitly; this will happen for you upon application exit.
 
-ensure_client :: () -> bool {
     if core_midi_client == 0 {
         init_objective_c();
 
@@ -227,13 +205,14 @@ ensure_client :: () -> bool {
         result := MIDIClientCreate(cfstring, null, null, *core_midi_client); // @TODO: Posisbly we should use MIDIClientCreateWithBlock
 
         success := result == 0;
-        
+
         // Setup Objective-C blocks for the MIDI input callback.
         input_block.isa = xx _NSConcreteGlobalBlock;
         input_block.invoke = xx midi_input_callback;
         input_block.descriptor = *input_block_descriptor;
         input_block_descriptor.size = size_of(Objective_C_Block_Basic);
 
+        // Setup ports.
         if result == 0 {
             success &= init_input_port(*input_port);
             success &= init_output_port(*output_port);
@@ -277,6 +256,7 @@ make_cf_string :: ($defer_release := true) -> CFStringRef #expand {
 }
 
 mach_timestamp_to_apollo_time :: (timestamp: u64) -> Apollo_Time #expand {
+    // @Incomplete: This is probably not the most accurate way of converting.
     time_milliseconds := (timestamp * mach_timebase.numer) / (1_000_000 * mach_timebase.denom);
     return milliseconds_to_apollo(cast(s64) time_milliseconds);
 }

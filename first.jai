@@ -51,6 +51,9 @@ do_examples :: (build: bool, clean: bool) {
         assert(extension_found);
 
         if clean {
+            dsym_directory := tprint("%/%.dSYM", base_path, file_name_without_extension);
+            if is_directory(dsym_directory)  delete_directory(dsym_directory);
+
             file_delete(tprint("%/%", base_path, file_name_without_extension));
             file_delete(tprint("%/%.exe", base_path, file_name_without_extension));
             file_delete(tprint("%/%.pdb", base_path, file_name_without_extension));

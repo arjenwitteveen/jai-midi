@@ -49,20 +49,14 @@ generate_bindings :: () -> bool {
             array_add(*system_include_paths, LIBC_PATH);
             array_add(*source_files,  tprint("%/CoreMIDI.h", COREMIDI_PATH));
             array_add(*source_files,  tprint("%/mach/mach_time.h", LIBC_PATH));
-            // array_add(*source_files,  tprint("%/MacTypes.h", LIBC_PATH));
             array_add(*path_fragments_to_treat_as_non_system_paths,
                       "mach/mach_time.h",
-                      "MIDICapabilityInquiry.h",
                       "MIDIMessages.h",
-                      "MIDINetworkSession.h",
-                      "MIDIServices.h",
-                      "MIDISetup.h",
-                      "MIDIThruConnection.h");
-
-            footer = MACOS_FOOTER;
+                      "MIDIServices.h");
 
             array_add(*extra_clang_arguments, "-isysroot", MACOS_SDK_PATH, "-x", "c", tprint("-F%", FRAMEWORKS_PATH));
 
+            footer = MACOS_FOOTER;
             visitor = macos_visitor;
         }
     }
@@ -163,10 +157,24 @@ alsa_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_V
 
 
 macos_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_Visit_Result {
-    // @TODO: The members with type MIDITimeStamp (u64) are 8 byte aligned, but in C they are 4 byte aligned...
-    // if decl.name == "timeStamp" {
+    // The members with type MIDITimeStamp (u64) are 8 byte aligned, but in C they are 4 byte aligned. This is a hack to get them aligned properly.
+    if decl.name == "timeStamp" {
+        midi_timestamp_type := New(CType);
+        midi_timestamp_type.size = 8;
+        midi_timestamp_type.hardcoded_jai_string = "MIDITimeStamp #align 4";
+        decl.type = midi_timestamp_type;
+    }
 
-    // }
+    // This is for removing an anonymous struct that contains the kMIDIInvalidUniqueID value.
+    if decl.kind == .ENUM && decl.name == "" {
+        en := cast(*Enum) decl;
+        for en.enumerates {
+            if it.name == "kMIDIInvalidUniqueID" {
+                en.decl_flags |= .OMIT_FROM_OUTPUT;
+                return .STOP;
+            }
+        }
+    }
 
     return .RECURSE;
 }
@@ -184,6 +192,8 @@ macos_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_
 MACOS_FOOTER :: #string END
 
 #scope_export
+
+kMIDIInvalidUniqueID : MIDIUniqueID : 0;
 
 UTF32Char :: u32;
 ConstStringPtr :: *u8;
