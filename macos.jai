@@ -60,13 +60,11 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     input.source_endpoint = source_endpoint;
     input.time_base = mach_absolute_time();
 
-    result := MIDIPortConnectSource(input_port, input.source_endpoint, cast(*void) input);
-    assert(result == 0, "Error in MIDIPortConnectSource (%)", result);
+    init_input_block(input);
+    init_input_port(*input.port, "input_port", *input.input_block);
 
-    // @Note: This code is the version to use when you want to open an actual input that other clients can see. Maybe we
-    // can support that in the future, although not every OS will support this.
-    // input_name := make_cf_string("input");
-    // result := MIDIDestinationCreateWithProtocol(core_midi_client, input_name, xx kMIDIProtocol._1_0, *input.handle, xx *input._input_block);
+    result := MIDIPortConnectSource(input.port, input.source_endpoint, null);
+    assert(result == 0, "Error in MIDIPortConnectSource (%)", result);
 
     if result {
         free(input);
@@ -78,9 +76,39 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
 
 close_input :: (input: *MIDI_Input) {
     if input {
-        MIDIPortDisconnectSource(input_port, input.source_endpoint);
+        if input.virtual_endpoint {
+            assert(input.source_endpoint == 0, "The given input seems to be a virtual input, but for some reason it has a regular source endpoint set.");
+            result := MIDIEndpointDispose(input.virtual_endpoint); // @TODO: Check result.
+        } else {
+            result := MIDIPortDisconnectSource(input.port, input.source_endpoint); // @TODO: Check result.
+        }
+
+        MIDIPortDispose(input.port);
+
         free(input);
     }
+}
+
+open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
+    init_macos();
+
+    input := New(MIDI_Input);
+    input.index = -1;
+    input.callback = callback;
+    input.callback_data = user_data;
+    input.time_base = mach_absolute_time();
+    init_input_block(input);
+
+    cf_input_name := make_cf_string(input_name);
+    result := MIDIDestinationCreateWithProtocol(core_midi_client, cf_input_name, xx kMIDIProtocol._1_0, *input.virtual_endpoint, xx *input.input_block);
+    assert(result == 0, "Error in MIDIDestinationCreateWithProtocol (%)", result);
+
+    if result {
+        free(input);
+        return null;
+    }
+
+    return input;
 }
 
 open_output :: (destination_index: int) -> *MIDI_Output #must {
@@ -96,14 +124,41 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
     output.index = destination_index;
     output.destination_endpoint = destination_endpoint;
     output.time_base = mach_absolute_time();
+    init_output_port(*output.port, "output_port");
 
     return output;
 }
 
 close_output :: (output: *MIDI_Output, reset_all_notes := false) {
     if output {
+        if output.virtual_endpoint {
+            assert(output.destination_endpoint == 0, "The given output seems to be a virtual output, but for some reason it has a regular destination endpoint set.");
+            result := MIDIEndpointDispose(output.virtual_endpoint); // @TODO: Check result.
+        }
+
+        MIDIPortDispose(output.port);
+
         free(output);
     }
+}
+
+open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
+    init_macos();
+
+    output := New(MIDI_Output);
+    output.index = -1;
+    output.time_base = mach_absolute_time();
+
+    cf_output_name := make_cf_string(output_name);
+    result := MIDISourceCreateWithProtocol(core_midi_client, cf_output_name, xx kMIDIProtocol._1_0, *output.virtual_endpoint);
+    assert(result == 0, "Error in MIDISourceCreateWithProtocol (%)", result);
+
+    if result {
+        free(output);
+        return null;
+    }
+
+    return output;
 }
 
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
@@ -139,9 +194,12 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     packet = MIDIEventListAdd(*event_list, size_of(MIDIEventList), packet, 0 /* timestamp */, 1, *word);
     assert(packet != null);
 
-    // send_result := MIDIReceivedEventList(output.handle, *event_list);
-
-    send_result := MIDISendEventList(output_port, output.destination_endpoint, *event_list);
+    send_result: OSStatus;
+    if output.virtual_endpoint {
+        send_result = MIDIReceivedEventList(output.virtual_endpoint, *event_list);
+    } else {
+        send_result = MIDISendEventList(output.port, output.destination_endpoint, *event_list);
+    }
 
     if send_result {
         log_error("Error in MIDIReceivedEventList: %.", send_result);
@@ -151,25 +209,37 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
 }
 
 MIDI_Input_Platform_Data :: struct {
-    // callback_context: Context;
+    port: MIDIPortRef;
+
     source_endpoint: MIDIEndpointRef;
+    virtual_endpoint: MIDIEndpointRef;
     time_base: u64;
 
     ump_system_exclusive_buffer: [256] u8;
     ump_system_exclusive_buffer_count: int;
     ump_system_exclusive_status := UMP_System_Exclusive_Message_Status.Invalid;
     ump_system_exclusive_bytes_to_read: u8;
+
+    input_block: Objective_C_Block_MIDI_Input;
 }
 
 MIDI_Output_Platform_Data :: struct {
+    port: MIDIPortRef;
+
     destination_endpoint: MIDIEndpointRef;
+    virtual_endpoint: MIDIEndpointRef;
     time_base: u64;
 }
 
 MIDI_Source_Info :: MIDI_Endpoint_Info;
 MIDI_Destination_Info :: MIDI_Endpoint_Info;
 
+
+
+
 #scope_file
+
+
 
 MIDI_Endpoint_Info :: struct {
     name: string;
@@ -215,17 +285,17 @@ get_endpoint_info :: (endpoint: MIDIEndpointRef) -> MIDI_Endpoint_Info, bool {
     return result, success;
 }
 
-core_midi_client: MIDIClientRef;
-input_port: MIDIPortRef;
-output_port: MIDIPortRef;
+Objective_C_Block_MIDI_Input :: struct {
+    #as using block_basic: Objective_C_Block_Basic;
+    input: *MIDI_Input;
+}
 
-input_block_descriptor: Objective_C_Block_Basic_Descriptor;
-input_block: Objective_C_Block_Basic;
+core_midi_client: MIDIClientRef;
 
 mach_timebase: mach_timebase_info;
 
-midi_input_callback :: (block: *Objective_C_Block_Basic, event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
-    input := cast(*MIDI_Input)src_conn_ref_con;
+midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
+    input := block.input;
 
     ctx: Context;
     push_context ctx {
@@ -258,7 +328,8 @@ midi_input_callback :: (block: *Objective_C_Block_Basic, event_list: *MIDIEventL
         while packet != end_packet {
             defer packet += 1;
 
-            timestamp := mach_timestamp_to_apollo_time(packet.timeStamp - input.time_base);
+            timestamp: Apollo_Time;
+            if packet.timeStamp  timestamp = mach_timestamp_to_apollo_time(packet.timeStamp - input.time_base);
 
             word := packet.words.data;
             end_word := word + packet.wordCount;
@@ -408,8 +479,6 @@ decode_ump_bytes :: (decoder: *MIDI_Decoder, bytes: [] u8) -> UMP_Message, bool 
 }
 
 init_macos :: () -> bool {
-    // @Note: Apple advises not to dispose clients or ports explicitly; this will happen for you upon application exit.
-
     if core_midi_client == 0 {
         init_objective_c();
 
@@ -419,18 +488,6 @@ init_macos :: () -> bool {
 
         success := result == 0;
 
-        // Setup Objective-C blocks for the MIDI input callback.
-        input_block.isa = xx _NSConcreteGlobalBlock;
-        input_block.invoke = xx midi_input_callback;
-        input_block.descriptor = *input_block_descriptor;
-        input_block_descriptor.size = size_of(Objective_C_Block_Basic);
-
-        // Setup ports.
-        if result == 0 {
-            success &= init_input_port(*input_port);
-            success &= init_output_port(*output_port);
-        }
-
         mach_timebase_info_(*mach_timebase);
 
         return success;
@@ -438,15 +495,24 @@ init_macos :: () -> bool {
     return true;
 }
 
-init_input_port :: (port: *MIDIPortRef) -> bool {
-    port_name := make_cf_string("input_port");
-    result := MIDIInputPortCreateWithProtocol(core_midi_client, port_name, xx kMIDIProtocol._1_0, port, xx *input_block);
+input_block_descriptor :: Objective_C_Block_Basic_Descriptor.{size = size_of(Objective_C_Block_MIDI_Input)};
+
+init_input_block :: (input: *MIDI_Input) {
+    input.input_block.isa = xx _NSConcreteGlobalBlock;
+    input.input_block.invoke = xx midi_input_callback;
+    input.input_block.descriptor = *input_block_descriptor;
+    input.input_block.input = input;
+}
+
+init_input_port :: (port: *MIDIPortRef, name: string, input_block: *Objective_C_Block_Basic) -> bool {
+    port_name := make_cf_string(name);
+    result := MIDIInputPortCreateWithProtocol(core_midi_client, port_name, xx kMIDIProtocol._1_0, port, xx input_block);
     assert(result == 0, "Error in MIDIInputPortCreateWithProtocol (%)", result);
     return result == 0;
 }
 
-init_output_port :: (port: *MIDIPortRef) -> bool {
-    port_name := make_cf_string("output_port");
+init_output_port :: (port: *MIDIPortRef, name: string) -> bool {
+    port_name := make_cf_string(name);
     result := MIDIOutputPortCreate(core_midi_client, port_name, port);
     assert(result == 0, "Error in MIDIOutputPortCreate (%)", result);
     return result == 0;

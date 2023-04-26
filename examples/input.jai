@@ -22,6 +22,10 @@ main :: () {
 
     input := open_input(source_index, midi_input_callback);
 
+    // Instead of connecting to a specific source, we can create a 'virtual' input. This input will be visible to other
+    // clients, who can then choose to connect to us. This is not supported on all platforms, however.
+    // input := open_virtual_input("My Input", midi_input_callback);
+
     if input {
         print("Listening for the next % seconds...\n", INPUT_WAIT_SECONDS);
         sleep_milliseconds(INPUT_WAIT_SECONDS * 1000); // Sleep and wait for messages to come in through the callback.

@@ -89,6 +89,18 @@
 //     Send one or multiple MIDI messages to the given output. Returns false if at least one message failed to send.
 //
 //
+// * Virtual endpoints.
+//
+// Instead of directly connecting to a MIDI source or destination, some platforms allow you to create a 'virtual'
+// endpoint. Other clients can see these endpoints and connect to your client on their own accord. To accomodate this,
+// the following procedures are available, but not on all platforms:
+//
+//   open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input
+//   open_virtual_output :: (output_name: string) -> *MIDI_Output
+//
+// Virtual inputs and outputs can be used in the same way as regular ones.
+//
+//
 // * Utilities.
 //
 // Some simple MIDI-related helper functions and enums are defined in the module. Some of the more useful ones to get

@@ -18,6 +18,10 @@ main :: () {
 
     output := open_output(destination_index);
 
+    // Instead of connecting to a specific destination, we can create a 'virtual' output. This output will be visible to other
+    // clients, who can then choose to connect to us. This is not supported on all platforms, however.
+    // output := open_virtual_output("My Output");
+
     if output {
         play_a_song(output);
         close_output(output);
