@@ -123,6 +123,7 @@ create_pitch_bend_message :: (value: float, channel: u8 = 0) -> MIDI_Message {
 }
 
 create_system_exclusive_message :: (data: [] u8) -> MIDI_Message {
+    assert(data.count >= 2 && data[0] == 0xf0 && data[data.count - 1] == 0xf7, "The given buffer must start with a system-exclusive status byte (0xf0) and end with an end-of system-exclusive status byte (0xf7).");
     result: MIDI_Message;
     result.status = .System_Exclusive;
     result.system_exclusive_info.buffer = data;

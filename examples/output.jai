@@ -1,23 +1,27 @@
 // Example of opening a MIDI output and sending data through it.
 
 main :: () {
-    // First let's list all the MIDI destinations.
-    print_available_midi_endpoints(include_sources = false);
-    print("\n");
+    args := get_command_line_arguments();
 
-    // Change destination_name to (part of) the name of an available MIDI destination. On Windows, the current value
-    // should match the default Microsoft GS Wavetable Synth, for example.
-    destination_name :: "Massive";
-    // destination_name :: "MIDI Monitor";
+    if args.count < 2 {
+        print("Usage: output destination\n\n");
+        print("Please provide the index of a MIDI destination. There are ");
+        print_available_midi_endpoints(include_sources = false);
+        return;
+    }
 
-    destination_index := get_destination_index_by_name(destination_name, match_full_name = false);
-    if destination_index >= 0 {
-        output := open_output(destination_index);
-        defer close_output(output);
-        if output {
-            play_a_song(output);
-        } else  log_error("Could not open output for destination '%'.", destination_name);
-    } else  log_error("Destination with name '%' could not be found.", destination_name);
+    destination_index, parse_success := string_to_int(args[1]);
+    if !parse_success || destination_index < 0 {
+        log_error("Invalid MIDI destination index '%'.\n", args[1]);
+        return;
+    }
+
+    output := open_output(destination_index);
+
+    if output {
+        play_a_song(output);
+        close_output(output);
+    }
 }
 
 play_a_song :: (output: *MIDI_Output) {
@@ -27,9 +31,6 @@ play_a_song :: (output: *MIDI_Output) {
     root_note :: 0x40;
     relative_notes :: int.[0, -2, -7, -5];
     major_seventh_arpeggio :: u8.[0, 4, 7, 11, 12, 11, 7, 4];
-
-    // Use the vibraphone! Assuming we're talking to an output using GM instrument patches, of course.
-    send_midi_message(output, create_midi_message(.Program_Change, 11));
 
     // Marvel at this beautiful musical composition.
     for relative_note: relative_notes {

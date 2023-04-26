@@ -26,13 +26,13 @@ get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
     return result, true;
 }
 
-get_source_name :: (index: int) -> string #must {
+get_source_name :: (index: int) -> string {
     source_info, success := get_source_info(index);
     if success  return copy_string(to_string(source_info.product_name.data), temp);
     return "";
 }
 
-get_destination_name :: (index: int, include_port_info := true) -> string #must {
+get_destination_name :: (index: int, include_port_info := true) -> string {
     destination_info, success := get_destination_info(index);
     if success  return copy_string(to_string(destination_info.product_name.data), temp);
     return "";

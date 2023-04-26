@@ -49,7 +49,7 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
 
     source_endpoint := MIDIGetSource(xx source_index);
     if !source_endpoint {
-        log_error("Cannot open MIDI output with source %.", source_endpoint);
+        log_error("Cannot open MIDI input for source %.", source_index);
         return null;
     }
 
@@ -88,7 +88,7 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
 
     destination_endpoint := MIDIGetDestination(xx destination_index);
     if !destination_endpoint {
-        log_error("Cannot open MIDI output with destination %.", destination_index);
+        log_error("Cannot open MIDI output for destination %.", destination_index);
         return null;
     }
 

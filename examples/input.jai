@@ -5,23 +5,28 @@ midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Ap
 }
 
 main :: () {
-    // First let's list all the MIDI sources.
-    print_available_midi_endpoints(include_destinations = false);
-    print("\n");
+    args := get_command_line_arguments();
 
-    // Change source_name to (part of) the name of an available MIDI source, like a MIDI keyboard.
-    source_name :: "Keystation";
-    source_index := get_source_index_by_name(source_name, match_full_name = false);
+    if args.count < 2 {
+        print("Usage: input source\n\n");
+        print("Please provide the index of a MIDI source. There are ");
+        print_available_midi_endpoints(include_destinations = false);
+        return;
+    }
 
-    if source_index >= 0 {
-        input := open_input(source_index, midi_input_callback);
-        defer close_input(input);
+    source_index, parse_success := string_to_int(args[1]);
+    if !parse_success || source_index < 0 {
+        log_error("Invalid MIDI source index '%'.\n", args[1]);
+        return;
+    }
 
-        if input {
-            print("Listening for input from '%' for the next % seconds...\n", source_name, INPUT_WAIT_SECONDS);
-            sleep_milliseconds(INPUT_WAIT_SECONDS * 1000); // Sleep and wait for messages to come in through the callback.
-        } else  log_error("Could not open input for source '%'.", source_name);
-    } else  log_error("Source with name '%' could not be found.", source_name);
+    input := open_input(source_index, midi_input_callback);
+
+    if input {
+        print("Listening for the next % seconds...\n", INPUT_WAIT_SECONDS);
+        sleep_milliseconds(INPUT_WAIT_SECONDS * 1000); // Sleep and wait for messages to come in through the callback.
+        close_input(input);
+    }
 }
 
 INPUT_WAIT_SECONDS :: 10;

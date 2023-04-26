@@ -28,13 +28,13 @@ get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
     return .{}, false;
 }
 
-get_source_name :: (index: int) -> string #must {
+get_source_name :: (index: int) -> string {
     info, success := get_source_info(index);
     if success  return tprint("% (%) %:%", info.client_name, info.port_name, info.client_number, info.port_number);
     return "";
 }
 
-get_destination_name :: (index: int) -> string #must {
+get_destination_name :: (index: int) -> string {
     info, success := get_destination_info(index);
     if success  return tprint("% (%) %:%", info.client_name, info.port_name, info.client_number, info.port_number);
     return "";
