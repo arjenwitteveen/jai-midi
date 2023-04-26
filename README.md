@@ -11,8 +11,6 @@ The following backends are used:
 - On macOS, [CoreMIDI](https://developer.apple.com/documentation/coremidi?language=objc) is used.
 - On Linux, [ALSA](https://www.alsa-project.org/alsa-doc/alsa-lib/seq.html) is used. A version of `libasound` is included, as well as the necessary ALSA headers needed to generate bindings with.
 
-Once the compiler is available for macOS, the goal is to support that as well.
-
 ## Examples
 
 The following [examples](examples) are available:
