@@ -1,3 +1,6 @@
+// This program draws a piano keyboard, showing which keys are pressed based on the MIDI input that is selected. Making
+// it generate sound is left as an exercise to the reader!
+
 #import "Basic";
 #import "Math";
 #import "String";
@@ -201,7 +204,7 @@ draw_keyboard :: () {
     key_height := 160.0;
 
     black_key_height_factor := 0.6;
-    black_key_width_factor := 0.66;
+    black_key_width_factor := 0.5;
     black_key_border := 2.0;
 
     keyboard_rect_no_pad := get_rect(0, 0, xx window_width, key_height + 2 * padding);
@@ -242,6 +245,10 @@ draw_keyboard :: () {
             black_key_rect.h *= black_key_height_factor;
             black_key_rect.y += key_rect.h - black_key_rect.h;
             black_key_rect.x -= 0.5 * (black_key_rect.w + key_padding);
+
+            n := it % 12;
+            if n == 1 || n == 6   black_key_rect.x -= 1.0;
+            if n == 3 || n == 10  black_key_rect.x += 1.0;
 
             black_key_backing_rect := black_key_rect;
             black_key_backing_rect.x -= black_key_border;
