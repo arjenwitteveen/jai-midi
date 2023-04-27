@@ -9,7 +9,7 @@ print_available_midi_endpoints :: (include_sources := true, include_destinations
                 source_name := get_source_name(it);
                 print("[%] %\n", it, source_name);
             }
-        } else print("No available MIDI sources.\n");
+        } else print("no available MIDI sources.\n");
     }
 
     if include_destinations {
@@ -21,7 +21,7 @@ print_available_midi_endpoints :: (include_sources := true, include_destinations
                 destination_name := get_destination_name(it);
                 print("[%] %\n", it, destination_name);
             }
-        } else print("No available MIDI destinations.\n");
+        } else print("no available MIDI destinations.\n");
     }
 }
 
