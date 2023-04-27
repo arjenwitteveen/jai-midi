@@ -3,7 +3,7 @@ This module aims to provide basic MIDI I/O support for Jai programs in a simple 
 
 To use this module you need at least Jai beta 0.1.057.
 
-*Disclaimer: I only have so much MIDI hardware that I can experiment with, so do not consider this module to be thoroughly battle-tested. The Windows version has been developed on Windows 10. The Linux implementation has been tested on a virtual machine running Ubuntu 22.04 LTS.*
+*Disclaimer: I only have so much MIDI hardware that I can experiment with, so do not consider this module to be thoroughly battle-tested. The Windows version has been tested on Windows 10; the macOS implementation has been tested on Big Sur 11.16.1; the Linux implementation has been tested on a virtual machine running Ubuntu 22.04 LTS.*
 
 ## Backends
 The following backends are used:
