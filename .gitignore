@@ -6,3 +6,4 @@ xcode/
 *.exe
 *.pdb
 *.dat
+**/*.dSYM/**

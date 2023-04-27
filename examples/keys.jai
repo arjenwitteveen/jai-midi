@@ -19,11 +19,17 @@ Input :: #import "Input";
 
 APP_NAME :: "Keys";
 
+KEYBOARD_HEIGHT :: 180.0;
+PADDING :: 4.0;
+
 KEYBOARD_BACKGROUND_COLOR :: Vector4.{0.11, 0.11, 0.11, 1.0};
+PRESSED_KEY_COLOR         :: Vector4.{0.2, 0.9, 0.7, 1.0};
+GAUGE_BACKGROUND_COLOR    :: Vector4.{0.3, 0.1, 0.1, 1.0};
+GAUGE_ACTIVITY_COLOR      :: PRESSED_KEY_COLOR; //Vector4.{0.2, 0.5, 0.5, 1.0};
 
 my_window: Window_Type;
 window_width:  s32 = 1280;
-window_height: s32 = 300;
+window_height: s32 = 400;
 dropped_files: [..] string;
 current_time: float64;
 last_time:    float64;
@@ -35,7 +41,9 @@ selected_source: s32;
 available_sources: [..] string;
 
 pressed_keys: [256] bool;
-
+pitch_bend := 0.0;
+cc_value := 0.0;
+cc_index := 1;
 time_since_last_input := 10.0;
 
 clear_pressed_keys :: () {
@@ -47,10 +55,17 @@ midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Ap
 
     if message.status == {
         case .Note_On; {
-            pressed_keys[message.note_info.note] = true;
+            pressed_keys[message.note_info.note] = message.note_info.velocity > 0;
         }
         case .Note_Off; {
             pressed_keys[message.note_info.note] = false;
+        }
+        case .Pitch_Bend; {
+            pitch_bend = pitch_bend_get_float(message.pitch_bend_info);
+        }
+        case .Control_Change; {
+            cc_value = message.control_change_info.value / 127.0;
+            cc_index = message.control_change_info.controller;
         }
     }
 }
@@ -149,14 +164,12 @@ draw_one_frame :: () {
     x, y, width, height := get_dimensions(my_window, true);
     ui_per_frame_update(my_window, width, height, current_time);
 
-    pad := 4.0;
+    dropdown_rect := get_rect(2 * PADDING, xx window_height, 500.0, 26.0);
+    dropdown_rect.y -= dropdown_rect.h + 1.5 * PADDING;
+    dropdown(dropdown_rect, available_sources, *selected_source);
 
-    r := get_rect(2 * pad, xx window_height, 500.0, 26.0);
-    r.y -= r.h + 1.5 * pad;
-    dropdown(r, available_sources, *selected_source);
-
-    label_rect := r;
-    label_rect.x += r.w + 10.0;
+    label_rect := dropdown_rect;
+    label_rect.x += dropdown_rect.w + 10.0;
     label_theme: Label_Theme;
     label_theme.alignment = .Left;
  	label_theme.text_color = .{.8, .8, .8, 1};
@@ -169,7 +182,7 @@ draw_one_frame :: () {
         TIME_FADE :: 0.9;
 
         activity_light_size := 8.0;
-        activity_light_rect := get_rect(label_rect.x, label_rect.y + 0.5 * (r.h - activity_light_size), activity_light_size, activity_light_size);
+        activity_light_rect := get_rect(label_rect.x, label_rect.y + 0.5 * (dropdown_rect.h - activity_light_size), activity_light_size, activity_light_size);
         color := INACTIVE_COLOR;
         if time_since_last_input < TIME_FULL  color  = ACTIVE_COLOR;
         else if time_since_last_input < TIME_FADE  color = lerp(INACTIVE_COLOR, ACTIVE_COLOR, (TIME_FADE - time_since_last_input) / TIME_FADE);
@@ -181,9 +194,11 @@ draw_one_frame :: () {
         if input {
             label(label_rect, "Connected", *label_theme);
         } else {
-            label(label_rect, "Not connected", *label_theme);
+            label(label_rect, "Error!", *label_theme);
         }
     }
+
+    draw_gauges();
 
     draw_keyboard();
 
@@ -196,19 +211,16 @@ draw_keyboard :: () {
     PIANO_MIDI_START_INDEX :: 21; // A-1
     PIANO_MIDI_END_INDEX :: 108; // C7
 
-    PRESSED_KEY_COLOR :: Vector4.{0.2, 0.9, 0.7, 1.0};
-
     padding := 4.0;
     key_border := 10.0;
     key_padding := 2.0;
-    key_height := 160.0;
 
     black_key_height_factor := 0.6;
     black_key_width_factor := 0.5;
     black_key_border := 2.0;
 
-    keyboard_rect_no_pad := get_rect(0, 0, xx window_width, key_height + 2 * padding);
-    keyboard_rect := get_rect(padding, padding, window_width - 2 * padding, key_height);
+    keyboard_rect_no_pad := get_rect(0, 0, xx window_width, KEYBOARD_HEIGHT + 2 * padding);
+    keyboard_rect := get_rect(padding, padding, window_width - 2 * padding, KEYBOARD_HEIGHT);
 
     first_key_rect := keyboard_rect;
     first_key_rect.w /= 52.0;
@@ -264,6 +276,38 @@ draw_keyboard :: () {
             key_rect.x += key_rect.w + key_padding;
         }
     }
+}
+
+// Draw gauges for pitch bend and CC messages.
+draw_gauges :: () {
+    label_theme: Label_Theme;
+    label_theme.alignment = .Center;
+ 	label_theme.text_color = .{.8, .8, .8, 1};
+    label_theme.alignment_pad_ems = 0.0;
+
+    GAUGE_WIDTH :: 300.0;
+    GAUGE_HEIGHT :: 24.0;
+
+    Simp.set_shader_for_color();
+    rect := get_rect(0.5 * window_width - GAUGE_WIDTH - PADDING, KEYBOARD_HEIGHT + 3 * PADDING, GAUGE_WIDTH, GAUGE_HEIGHT);
+    immediate_rect(rect, GAUGE_BACKGROUND_COLOR);
+    active_rect := rect;
+    active_rect.x += 0.5 * rect.w;
+    active_rect.w *= 0.5 * pitch_bend;
+    immediate_rect(active_rect, GAUGE_ACTIVITY_COLOR);
+    label_rect := rect;
+    label_rect.y += rect.h;
+    label(label_rect, tprint("Pitch Bend: %", formatFloat(pitch_bend, trailing_width=2, zero_removal=.NO)), *label_theme);
+
+    Simp.set_shader_for_color();
+    rect.x += rect.w + 2 * PADDING;
+    immediate_rect(rect, GAUGE_BACKGROUND_COLOR);
+    active_rect = rect;
+    active_rect.w *= cc_value;
+    immediate_rect(active_rect, GAUGE_ACTIVITY_COLOR);
+    label_rect = rect;
+    label_rect.y += rect.h;
+    label(label_rect, tprint("CC %: %", cc_index, formatFloat(cc_value, trailing_width=2, zero_removal=.NO)), *label_theme);
 }
 
 immediate_rect :: (rect: Rect, color: Vector4) {
