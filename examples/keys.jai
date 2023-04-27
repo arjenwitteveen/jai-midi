@@ -23,9 +23,9 @@ KEYBOARD_HEIGHT :: 180.0;
 PADDING :: 4.0;
 
 KEYBOARD_BACKGROUND_COLOR :: Vector4.{0.11, 0.11, 0.11, 1.0};
-PRESSED_KEY_COLOR         :: Vector4.{0.2, 0.9, 0.7, 1.0};
+PRESSED_KEY_COLOR         :: Vector4.{0.9, 0.45, 0.2, 1.0};
 GAUGE_BACKGROUND_COLOR    :: Vector4.{0.3, 0.1, 0.1, 1.0};
-GAUGE_ACTIVITY_COLOR      :: PRESSED_KEY_COLOR; //Vector4.{0.2, 0.5, 0.5, 1.0};
+GAUGE_ACTIVITY_COLOR      :: PRESSED_KEY_COLOR;
 
 my_window: Window_Type;
 window_width:  s32 = 1280;
