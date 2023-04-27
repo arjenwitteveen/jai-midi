@@ -5,3 +5,4 @@ midi_files/
 xcode/
 *.exe
 *.pdb
+*.dat

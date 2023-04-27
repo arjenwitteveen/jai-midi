@@ -8,7 +8,8 @@
 //
 // To use this module you need at least Jai beta 0.1.057.
 //
-//
+
+
 // * Getting info on endpoints.
 //
 // Each OS handles MIDI endpoints a bit differently. This module uses the concept of zero-based endpoint indices: index
@@ -40,8 +41,8 @@
 //     Get the endpoint index based on a name; by default it returns the first endpoint that contains the given
 //     string, but you can optionally require the full name to be matched instead. Returns -1 if no endpoint was
 //     found.
-//
-//
+
+
 // * Receiving MIDI.
 //
 // MIDI messages are received through a callback function that you have to provide. Two things are important to keep in
@@ -70,8 +71,8 @@
 // around, copy them. The received buffers will include the system-exclusive status bytes (0xf0 and 0xf7) as the first
 // and last bytes. When sending a system-exclusive message, you are also responsible for adding those bytes to the
 // buffer you want to send.
-//
-//
+
+
 // * Sending MIDI.
 //
 // Sending is a more straightforward than receiving. You just open an output to a MIDI destination, and start sending
@@ -87,20 +88,21 @@
 //   send_midi_messages :: (output: *MIDI_Output, messages: [] MIDI_Message) -> bool
 //
 //     Send one or multiple MIDI messages to the given output. Returns false if at least one message failed to send.
-//
-//
+
+
 // * Virtual endpoints.
 //
 // Instead of directly connecting to a MIDI source or destination, some platforms allow you to create a 'virtual'
-// endpoint. Other clients can see these endpoints and connect to your client on their own accord. To accomodate this,
-// the following procedures are available, but not on all platforms:
+// endpoint. Other clients can see these endpoints and connect to *you*, rather than the other way around. To accomodate
+// this, the following procedures are available:
 //
 //   open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input
 //   open_virtual_output :: (output_name: string) -> *MIDI_Output
 //
-// Virtual inputs and outputs can be used in the same way as regular ones.
-//
-//
+// After creation, virtual inputs and outputs can be used in the same way as regular ones. Currently we only support
+// virtual endpoints for macOS.
+
+
 // * Utilities.
 //
 // Some simple MIDI-related helper functions and enums are defined in the module. Some of the more useful ones to get
@@ -119,8 +121,8 @@
 //   pitch_bend_get_float :: (info: MIDI_Pitch_Bend_Info) -> float
 //
 //     Get the pitch bend value as an integer in the range [0, 16383], or as float in the range [-1.0, 1.0].
-//
-//
+
+
 // * Reading MIDI files.
 //
 // Support for reading MIDI files is provided through midi_file.jai. The interface is very simple.
@@ -128,12 +130,12 @@
 //   read_midi_file :: (file_path: string) -> MIDI_File, bool
 //
 //     Reads a MIDI file and returns it contents; the second return value indicates success.
-//
-//
 
+
+// * Further reading
 //
 // One good source of MIDI information is: https://www.recordingblogs.com/wiki/musical-instrument-digital-interface-midi.
-//
+
 
 #module_parameters(VERBOSE_LOGGING := false, CLIENT_NAME := "jai-midi");
 

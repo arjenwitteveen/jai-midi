@@ -4,7 +4,7 @@ main :: () {
     args := get_command_line_arguments();
 
     if args.count < 2 {
-        print("Usage: output destination\n\n");
+        print("Usage: output destination_index\n\n");
         print("Please provide the index of a MIDI destination. There are ");
         print_available_midi_endpoints(include_sources = false);
         return;

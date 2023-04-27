@@ -8,19 +8,19 @@ main :: () {
     destination_name :: "MIDI Monitor";
 
     destination_index := get_destination_index_by_name(destination_name, match_full_name = false);
-    if destination_index >= 0 {
-        output := open_output(destination_index);
-        defer close_output(output);
-
-        if output {
-            print("Sending system-exclusive message...");
-            message := create_system_exclusive_message(BUFFER_TO_SEND);
-            send_midi_message(output, message);
-            print(" done.\n");
-        } else  log_error("Could not open output for destination '%'.", destination_name);
-    } else {
+    if destination_index < 0 {
         print("Destination with name '%' could not be found. There are ", destination_name);
         print_available_midi_endpoints(include_sources = false);
+        return;
+    }
+
+    output := open_output(destination_index);
+    if output {
+        print("Sending system-exclusive message...");
+        message := create_system_exclusive_message(BUFFER_TO_SEND);
+        send_midi_message(output, message);
+        print(" done.\n");
+        close_output(output);
     }
 }
 

@@ -1,24 +1,16 @@
 // Example of a little command line tool that can be used to dump system-exclusive data from a MIDI source to a file.
 
+OUTPUT_FILE :: "sysex.dat";
+
 Callback_Data :: struct {
-    file_name: string;
     semaphore: Semaphore;
+    buffer: [] u8;
 }
 
 midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) {
     if message.status == .System_Exclusive {
         callback_data := cast(*Callback_Data) user_data;
-
-        sysex := message.system_exclusive_info;
-        print("System-exclusive message received (% bytes).\n", sysex.buffer.count);
-        success := write_entire_file(callback_data.file_name, sysex.buffer.data, sysex.buffer.count);
-
-        if success {
-            print("Wrote %.\n", callback_data.file_name);
-        } else {
-            log_error("Error writing to %.", callback_data.file_name);
-        }
-
+        callback_data.buffer = array_copy(message.system_exclusive_info.buffer);
         signal(*callback_data.semaphore);
     }
 }
@@ -26,36 +18,38 @@ midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Ap
 main :: () {
     args := get_command_line_arguments();
 
-    if args.count < 3 {
-        print("Usage: dump_sysex <MIDI source name> <output filename>\n");
-        return;
-    }
-
-    source_name := args[1];
-    file_name := args[2];
-
-    source_index := get_source_index_by_name(source_name, match_full_name = false);
-
-    if source_index == -1 {
-        print("Given MIDI source could not be found; there are ");
+    if args.count < 2 {
+        print("Usage: dump_sysex source_index\n");
+        print("\nPlease provide the index of a MIDI source. There are ");
         print_available_midi_endpoints(include_destinations = false);
         return;
     }
 
-    callback_data := Callback_Data.{file_name = file_name};
-    init(*callback_data.semaphore);
-
-    input := open_input(source_index, midi_input_callback, *callback_data);
-    if !input {
-        print("Error opening MIDI input.\n");
+    source_index, parse_success := string_to_int(args[1]);
+    if !parse_success || source_index < 0 {
+        log_error("Invalid MIDI source index '%'.\n", args[1]);
         return;
     }
 
-    print("Waiting for system-exclusive message (press Ctrl+C to cancel)...\n");
+    callback_data: Callback_Data;
+    init(*callback_data.semaphore);
 
-    wait_for(*callback_data.semaphore);
+    input := open_input(source_index, midi_input_callback, *callback_data);
+    if input {
+        print("Waiting for system-exclusive message...\n");
+        wait_for(*callback_data.semaphore);
 
-    close_input(input);
+        print("System-exclusive message received (% bytes).\n", callback_data.buffer.count);
+        success := write_entire_file(OUTPUT_FILE, callback_data.buffer.data, callback_data.buffer.count);
+
+        if success {
+            print("Wrote %.\n", OUTPUT_FILE);
+        } else {
+            log_error("Error writing to %.", OUTPUT_FILE);
+        }
+
+        close_input(input);
+    }
 }
 
 #import,file "../module.jai";

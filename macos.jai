@@ -236,7 +236,6 @@ MIDI_Destination_Info :: MIDI_Endpoint_Info;
 
 
 
-
 #scope_file
 
 
@@ -484,7 +483,9 @@ init_macos :: () -> bool {
 
         // Initialize the client.
         cfstring := make_cf_string(CLIENT_NAME, false);
-        result := MIDIClientCreate(cfstring, null, null, *core_midi_client); // @TODO: Posisbly we should use MIDIClientCreateWithBlock
+
+         // @Note: Possibly we should use MIDIClientCreateWithBlock to receive MIDI system state change notifications.
+        result := MIDIClientCreate(cfstring, null, null, *core_midi_client);
 
         success := result == 0;
 

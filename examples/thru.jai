@@ -3,11 +3,10 @@
 // functions as a sort of MIDI passthrough.
 //
 // The example also showcases a simple message queue that can be shared between two threads, where one thread queues
-// message, and another dequeues them. Why not call send_midi_message from the callback directly? Well, not every MIDI
+// messages, and another dequeues them. Why not call send_midi_message from the callback directly? Well, not every MIDI
 // driver allows making calls to its API from the callback.
 
 LOG_MESSAGES :: true;
-
 QUEUE_SIZE :: 16;
 
 Callback_Data :: struct {
@@ -32,11 +31,26 @@ midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Ap
 }
 
 main :: () {
-    source_name :: "Keystation";
-    destination_name :: "Massive";
+    args := get_command_line_arguments();
 
-    source_index  := get_source_index_by_name(source_name);
-    destination_index := get_destination_index_by_name(destination_name);
+    if args.count < 3 {
+        print("Usage: input source_index destination_index\n");
+        print("\nPlease provide the index of a MIDI source and destination:\n\n");
+        print_available_midi_endpoints();
+        return;
+    }
+
+    source_index, source_parse_success := string_to_int(args[1]);
+    if !source_parse_success || source_index < 0 {
+        log_error("Invalid MIDI source index '%'.\n", args[1]);
+        return;
+    }
+
+    destination_index, destination_parse_success := string_to_int(args[2]);
+    if !destination_parse_success || destination_index < 0 {
+        log_error("Invalid MIDI destination index '%'.\n", args[2]);
+        return;
+    }
 
     callback_data: Callback_Data;
     init(*callback_data.read_semaphore);
@@ -49,7 +63,7 @@ main :: () {
         defer close_output(output);
 
         if input && output {
-            print("Made a connection from % to %. Press Ctrl+C to quit.\n", source_name, destination_name);
+            print("Made a connection from source % to destination %. Press Ctrl+C to quit.\n", source_index, destination_index);
 
             while true {
                 if wait_for(*callback_data.read_semaphore) == .SUCCESS {
@@ -59,16 +73,7 @@ main :: () {
                     callback_data.read_cursor = (callback_data.read_cursor + 1) % QUEUE_SIZE;
                 }
             }
-        } else {
-            if !input   log_error("Input '%' could not be opened.", source_name);
-            if !output  log_error("Output '%' could not be opened.", destination_name);
         }
-    } else {
-        if source_index < 0       log_error("Input '%' could not be found.", source_name);
-        if destination_index < 0  log_error("Output '%' could not be found.", destination_name);
-
-        print("\n");
-        print_available_midi_endpoints();
     }
 }
 

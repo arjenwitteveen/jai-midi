@@ -334,7 +334,11 @@ MIDI_Output_Platform_Data :: struct {
 MIDI_Source_Info :: MIDI_Port_Info;
 MIDI_Destination_Info :: MIDI_Port_Info;
 
+
+
 #scope_file
+
+
 
 with_sequencer :: () -> bool #expand {
     `sequencer: *snd_seq_t;
