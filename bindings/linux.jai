@@ -1373,8 +1373,8 @@ snd_midi_event_decode :: (dev: *snd_midi_event_t, buf: *u8, count: s64, ev: *snd
 
 #scope_file
 
-libasound :: #library "linux/libasound";
+libasound :: #library "../linux/libasound";
 
-#load "linux/seqmid.jai";
+#load "../linux/seqmid.jai";
 
 #import "POSIX";
