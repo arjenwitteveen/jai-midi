@@ -393,6 +393,15 @@ midi_input_thread :: (thread: *Thread) -> s64 {
             snd_midi_event_reset_decode(midi_event_decoder);
 
             number_of_bytes := snd_midi_event_decode(midi_event_decoder, midi_data_buffer.data, midi_data_buffer.count, event);
+            if number_of_bytes < 0 {
+                if -number_of_bytes == {
+                    case EINVAL;  log_error("Received an invalid sequencer event.");
+                    case ENOENT;  log_error("Event is not a valid MIDI message.");
+                    case ENOMEM;  log_error("Given buffer is too small.");
+                }
+
+                continue;
+            }
 
             midi_event_bytes: [] u8 = ---;
             midi_event_bytes.data = midi_data_buffer.data;
