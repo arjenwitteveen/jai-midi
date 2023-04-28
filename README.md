@@ -18,7 +18,7 @@ A simple build script (`first.jai`) is included with the module. This is mainly 
 
 ## Disclaimer
 
-I only have so much MIDI hardware that I can experiment with, so do not consider this module to be thoroughly battle-tested. The Windows version has been tested on Windows 10; the macOS implementation has been tested on Big Sur 11.16.1; the Linux implementation has been tested on a virtual machine running Ubuntu 22.04 LTS. For questions, suggestions, or bug reports, feel free to contact me on the Jai beta Discord.
+I only have so much MIDI hardware that I can experiment with, so do not consider this module to be thoroughly battle-tested. The Windows version has been tested on Windows 10; the macOS implementation has been tested on an Intel Mac on Big Sur; the Linux implementation has been tested on a virtual machine running Ubuntu 22.04 LTS. For questions, suggestions, or bug reports, feel free to contact me on the Jai beta Discord.
 
 ## License
 This module is provided under the [MIT license](LICENSE).
