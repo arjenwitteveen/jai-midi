@@ -5,7 +5,7 @@
 MIDI_File :: struct {
     content: string;
     format: u16;
-    division: u16;
+    time_division: u16;
     tracks: [..] MIDI_Track;
 }
 
@@ -64,7 +64,7 @@ read_midi_file :: (file_path: string) -> MIDI_File, bool {
     header_length := read_big_endian(cursor, u32);
     result.format = read_big_endian(cursor + 4, u16);
     number_of_track_chunks := read_big_endian(cursor + 6, u16);
-    result.division = read_big_endian(cursor + 8, u16);
+    result.time_division = read_big_endian(cursor + 8, u16);
     cursor += size_of(u32) + header_length;
 
     for 0..number_of_track_chunks - 1 {

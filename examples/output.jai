@@ -23,40 +23,22 @@ main :: () {
     // output := open_virtual_output("My Output");
 
     if output {
-        play_a_song(output);
+        root_note :: 64;
+        major_scale :: u8.[0, 2, 4, 5, 7, 9, 11];
+        note_length_milliseconds :: 300;
+
+        // Play some random notes from the major scale.
+        for 1..64 {
+            note := root_note + major_scale[random_get() % major_scale.count];
+            velocity := 100 + cast(u8) (random_get() % 20);
+
+            send_midi_message(output, create_midi_message(.Note_On, note, velocity));
+            sleep_milliseconds(note_length_milliseconds);
+            send_midi_message(output, create_midi_message(.Note_Off, note));
+        }
+
         close_output(output);
     }
-}
-
-play_a_song :: (output: *MIDI_Output) {
-    print("Playing some MIDI music...");
-
-    note_length_milliseconds : s32 : 300; // @Note: We use sleep to time our notes in this toy example, of course this isn't very accurate!
-    root_note :: 0x40;
-    relative_notes :: int.[0, -2, -7, -5];
-    major_seventh_arpeggio :: u8.[0, 4, 7, 11, 12, 11, 7, 4];
-
-    // Marvel at this beautiful musical composition.
-    for relative_note: relative_notes {
-        current_root_note := cast(u8) (root_note + relative_note);
-        send_midi_message(output, create_control_change_message(.Sustain_Pedal, 0x0));
-        send_midi_message(output, create_control_change_message(.Sustain_Pedal, 0x7f));
-        for note: major_seventh_arpeggio {
-            // Let's 'humanize' the velocity and note length a bit.
-            velocity := 100 + cast(u8) (random_get() % 20);
-            note_length := note_length_milliseconds + cast(s32) (random_get() % 10);
-            send_midi_message(output, create_midi_message(.Note_On, current_root_note + note, velocity));
-            send_midi_message(output, create_midi_message(.Note_Off, current_root_note + note)); // We're using the sustain pedal, so we can send the note off right away.
-            sleep_milliseconds(note_length);
-        }
-    }
-    send_midi_message(output, create_midi_message(.Note_On,  cast(u8) (root_note + relative_notes[relative_notes.count - 1] - 12), 100));
-    send_midi_message(output, create_midi_message(.Note_Off, cast(u8) (root_note + relative_notes[relative_notes.count - 1] - 12)));
-    sleep_milliseconds(6 * note_length_milliseconds);
-    send_midi_message(output, create_control_change_message(.Sustain_Pedal, 0x0));
-    sleep_milliseconds(200);
-
-    print(" done!\n");
 }
 
 #import "Basic";
