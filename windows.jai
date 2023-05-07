@@ -187,48 +187,48 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
         // @Note: If we get an OPEN message, the MIDI_Input struct will not have its handle set yet. We could set it
         // here if we ever want to notify people of events like these.
 
-        midi_event_bytes: [] u8 = ---;
-        error: bool;
+        midi_event_bytes: [] u8;
         timestamp := milliseconds_to_apollo(cast(s64) param2);
 
         if msg == {
             // Regular MIDI message.
-            case .ERROR; error = true; #through; // Invalid message received.
             case .DATA; {
-                if !error {
-                    midi_event_bytes.data = cast(*u8) *param1;
-                    midi_event_bytes.count = 3; // Messages received here always have a status byte.
-                    error = decode_midi_packet(input, midi_event_bytes, timestamp);
-                }
+                midi_event_bytes.data = cast(*u8) *param1;
+                midi_event_bytes.count = 3; // Messages received here always have a status byte.
+            }
+
+            case .ERROR; {
+                log_error("An invalid MIDI message was received by the driver.");
             }
 
             // System-exclusive message.
-            case .LONGERROR; error = true; #through; // Invalid or incomplete system-exclusive message received.
             case .LONGDATA; {
-                if !error {
-                    header := cast(*MIDIHDR) param1;
-                    midi_event_bytes.data = xx header.lpData;
-                    midi_event_bytes.count = header.dwBytesRecorded;
-                    error = decode_midi_packet(input, midi_event_bytes, timestamp);
-                }
-
-                if error && decoder.system_exclusive_message_in_progress {
-                    log_error("Discarding an invalid system-exclusive message (% bytes).", input.decoder.message_buffer.count);
-                    input.decoder.system_exclusive_message_in_progress = false;
-                    reset_system_exclusive_buffer(input.decoder);
-                }
-
-                // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We should *not*
-                // call reset_sysex_buffers in that case, or bad things will happen!
-                if midi_event_bytes.count > 0  reset_sysex_buffers(input);
+                header := cast(*MIDIHDR) param1;
+                midi_event_bytes.data = xx header.lpData;
+                midi_event_bytes.count = header.dwBytesRecorded;
             }
 
-            case .OPEN; // Input is opened.
+            case .LONGERROR; {
+                log_error("An invalid or incomplete system-exclusive message was received by the driver.");
+                reset_system_exclusive_buffer(*input.decoder);
+            }
 
-            case .CLOSE; // Input is closed.
+            // case .OPEN; // Input is opened.
+            // case .CLOSE; // Input is closed.
         }
 
-        if error  log_error("Discarding an invalid MIDI message.");
+        if midi_event_bytes.count > 0 {
+            message, message_decoded := decode_midi_packet(*input.decoder, midi_event_bytes);
+            if message_decoded {
+                post_message_to_input(input, message, timestamp);
+
+                if message.status == .System_Exclusive {
+                    // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We should *not*
+                    // call reset_sysex_buffers in that case, or bad things will happen!
+                    if midi_event_bytes.count > 0  reset_sysex_buffers(input);
+                }
+            }
+        }
     }
 }
 
