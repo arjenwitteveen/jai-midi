@@ -7,3 +7,10 @@ xcode/
 *.pdb
 *.dat
 **/*.dSYM/**
+tests/tests
+examples/input
+examples/output
+examples/dump_sysex
+examples/keys
+examples/read_midi_file
+examples/thru

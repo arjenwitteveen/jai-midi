@@ -7,10 +7,11 @@ EXAMPLES_PATH :: "examples";
 print_help_message :: () {
     print("Usage: jai first.jai - <command>\n\n");
     print("Commands:\n");
-    print("  test      Run test suite.\n");
-    print("  examples  Build all examples.\n");
-    print("  clean     Clean build artifacts for examples.\n");
-    print("  generate  Generate bindings for the current OS.\n");
+    print("  test       Run test suite.\n");
+    print("  test-comp  Compile test suite for debugging.\n");
+    print("  examples   Build all examples.\n");
+    print("  clean      Clean build artifacts for examples.\n");
+    print("  generate   Generate bindings for the current OS.\n");
 }
 
 #run {
@@ -25,6 +26,7 @@ print_help_message :: () {
 
     if args[0] == {
         case "test";      do_tests();
+        case "test-comp"; do_tests(false);
         case "examples";  do_examples(build = true, clean = false);
         case "clean";     do_examples(build = false, clean = true);
         case "generate";  do_bindings();
@@ -34,13 +36,22 @@ print_help_message :: () {
     }
 }
 
-do_tests :: () {
+do_tests :: (at_compile_time := true) {
     w := compiler_create_workspace("Tests");
     options := get_build_options(w);
     copy_commonly_propagated_fields(get_build_options(), *options);
-    options.output_type = .NO_OUTPUT;
+
+    if at_compile_time {
+        options.output_type = .NO_OUTPUT;
+    } else {
+        options.output_executable_name = "tests";
+        options.output_path = "tests";
+    }
+
     options.dead_code_elimination = .NONE;
     set_build_options(options, w);
+
+    add_build_string(tprint("AT_COMPILE_TIME :: %;", at_compile_time), w);
     add_build_file("tests/tests.jai", w);
 }
 

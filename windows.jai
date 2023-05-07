@@ -187,43 +187,39 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
         // @Note: If we get an OPEN message, the MIDI_Input struct will not have its handle set yet. We could set it
         // here if we ever want to notify people of events like these.
 
-        message: MIDI_Message = ---;
         midi_event_bytes: [] u8 = ---;
-        message_ready: bool;
-
-        timestamp := milliseconds_to_apollo(cast(s64) param2);
-
         error: bool;
+        timestamp := milliseconds_to_apollo(cast(s64) param2);
 
         if msg == {
             // Regular MIDI message.
             case .ERROR; error = true; #through; // Invalid message received.
             case .DATA; {
-                midi_event_bytes.data = cast(*u8) *param1;
-
                 if !error {
+                    midi_event_bytes.data = cast(*u8) *param1;
                     midi_event_bytes.count = 3; // Messages received here always have a status byte.
-                    message, message_ready = decode_midi_bytes(*input.decoder, midi_event_bytes);
-                } else {
-                    log_error("Discarding an invalid MIDI message.");
+                    error = decode_midi_packet(input, midi_event_bytes, timestamp);
                 }
             }
 
             // System-exclusive message.
             case .LONGERROR; error = true; #through; // Invalid or incomplete system-exclusive message received.
             case .LONGDATA; {
-                header := cast(*MIDIHDR) param1;
-                midi_event_bytes.data = xx header.lpData;
-                midi_event_bytes.count = header.dwBytesRecorded;
-
-                sysex_message, sysex_message_ready := handle_system_exclusive_message(input, midi_event_bytes, error);
-                if sysex_message_ready {
-                    message = sysex_message;
-                    message_ready = true;
+                if !error {
+                    header := cast(*MIDIHDR) param1;
+                    midi_event_bytes.data = xx header.lpData;
+                    midi_event_bytes.count = header.dwBytesRecorded;
+                    error = decode_midi_packet(input, midi_event_bytes, timestamp);
                 }
 
-                 // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We should *not*
-                 // call reset_sysex_buffers in that case, or bad things will happen!
+                if error && decoder.system_exclusive_message_in_progress {
+                    log_error("Discarding an invalid system-exclusive message (% bytes).", input.decoder.message_buffer.count);
+                    input.decoder.system_exclusive_message_in_progress = false;
+                    reset_system_exclusive_buffer(input.decoder);
+                }
+
+                // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We should *not*
+                // call reset_sysex_buffers in that case, or bad things will happen!
                 if midi_event_bytes.count > 0  reset_sysex_buffers(input);
             }
 
@@ -232,7 +228,7 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
             case .CLOSE; // Input is closed.
         }
 
-        if message_ready  post_message_to_input(input, message, timestamp);
+        if error  log_error("Discarding an invalid MIDI message.");
     }
 }
 

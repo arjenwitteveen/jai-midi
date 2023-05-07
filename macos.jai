@@ -304,26 +304,6 @@ midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIE
         packet := event_list.packet.data;
         end_packet := packet + event_list.numPackets;
 
-        message: MIDI_Message = ---;
-        message_ready: bool;
-
-        print_event_list :: (event_list: *MIDIEventList) {
-            p := event_list.packet.data;
-            print("event list (% packets):\n", event_list.numPackets);
-            for 0..event_list.numPackets - 1 {
-                print("  packet % (% words): ", it, p.wordCount);
-                for word_index: 0..p.wordCount - 1 {
-                    ump_bytes := ump_word_to_bytes(p.words[word_index]);
-                    for ump_bytes  print("% ", formatInt(it, base=16, minimum_digits=2));
-                    if word_index != p.wordCount - 1  print("- ");
-                }
-                print("\n");
-                p += 1;
-            }
-        }
-
-        // print_event_list(event_list);
-
         while packet != end_packet {
             defer packet += 1;
 
@@ -343,21 +323,18 @@ midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIE
                     words_read := handle_ump_sysex_event_list(input, word, end_word);
                     word += words_read;
 
-                    if !input.decoder.message_in_progress {
-                        message = create_system_exclusive_message(input.decoder.message_buffer);
-                        message_ready = true;
+                    if !input.decoder.system_exclusive_message_in_progress {
+                        message := create_system_exclusive_message(input.decoder.message_buffer);
+                        post_message_to_input(input, message, timestamp);
+                        reset_system_exclusive_buffer(*input.decoder);
                     }
                 } else {
                     midi_bytes: [] u8 = ump_bytes;
                     midi_bytes.data += 1;
                     midi_bytes.count -= 1;
-                    message = decode_midi_bytes(*input.decoder, midi_bytes);
-                    message_ready = true;
-
+                    decode_midi_packet(input, midi_bytes, timestamp);
                     word += 1;
                 }
-
-                if message_ready  post_message_to_input(input, message, timestamp);
             }
         }
     }
@@ -406,9 +383,9 @@ handle_ump_sysex_event_list :: (input: *MIDI_Input, start_word: *u32, end_word: 
         number_of_bytes := bytes[1] & 0xf;
 
         if sysex_status == .Start || sysex_status == .Complete_In_One_UMP {
-            assert(!decoder.message_in_progress);
+            assert(!decoder.system_exclusive_message_in_progress);
             reset_system_exclusive_buffer(decoder);
-            decoder.message_in_progress = true;
+            decoder.system_exclusive_message_in_progress = true;
             array_add(*decoder.message_buffer, cast(u8) MIDI_Status.System_Exclusive);
         }
 
@@ -416,7 +393,7 @@ handle_ump_sysex_event_list :: (input: *MIDI_Input, start_word: *u32, end_word: 
 
         if sysex_status == .Complete_In_One_UMP || sysex_status == .End {
             array_add(*decoder.message_buffer, cast(u8) MIDI_Status.End_Of_System_Exclusive);
-            decoder.message_in_progress = false;
+            decoder.system_exclusive_message_in_progress = false;
         }
 
         word += 1;

@@ -134,7 +134,7 @@
 
 // * Further reading
 //
-// One good source of MIDI information is: https://www.recordingblogs.com/wiki/musical-instrument-digital-interface-midi.
+// One good source of MIDI information is: https://www.recordingblogs.com/wiki/musical-instrument-digital-interface-midi
 
 
 #module_parameters(VERBOSE_LOGGING := false, CLIENT_NAME := "jai-midi");

@@ -8,6 +8,8 @@
     #assert false "The current operating system is not supported yet.";
 }
 
+VALIDATE_SYSTEM_EXCLUSIVE_BUFFERS :: true;
+
 MIDI_Input_Callback :: #type (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) -> ();
 
 MIDI_Input :: struct {
@@ -56,7 +58,7 @@ MIDI_Song_Request_Info          :: struct { song: u8; }
 MIDI_Decoder :: struct {
     running_status: u8;
     message_buffer: [..] u8;
-    message_in_progress: bool;
+    system_exclusive_message_in_progress: bool;
 }
 
 get_source_index_by_name :: (name: string, match_full_name := false) -> int {
@@ -89,7 +91,7 @@ get_destination_index_by_name :: (name: string, match_full_name := false) -> int
 
 create_midi_message :: (bytes: [] u8) -> MIDI_Message, bool {
     decoder: MIDI_Decoder;
-    result, success := decode_midi_bytes(*decoder, bytes);
+    result, success := decode_midi_packet(*decoder, bytes);
     return result, success;
 }
 
@@ -101,7 +103,7 @@ create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, chann
     bytes[0] = make_status_byte(status, channel);
     bytes[1] = data0;
     bytes[2] = data1;
-    result, success := decode_midi_bytes(*decoder, bytes);
+    result, success := decode_midi_packet(*decoder, bytes);
     return result, success;
 }
 
@@ -181,16 +183,22 @@ make_status_byte :: (status: MIDI_Status, channel: u8 = 0) -> u8 #expand {
 }
 
 get_status :: (byte: u8) -> MIDI_Status #expand {
-    if byte >= 0xf0  return cast(MIDI_Status) byte;
-    return cast(MIDI_Status) (byte & 0xf0);
+    // Voice messages.
+    if byte >= 0x80 && byte <= 0xef  return cast(MIDI_Status) (byte & 0xf0);
+    if byte >= 0xf0                  return cast(MIDI_Status) byte;
+    return .Invalid;
 }
 
 is_voice_status :: (status: MIDI_Status) -> bool #expand {
     return status >= .Note_Off && status < .System_Exclusive;
 }
 
+is_system_common_status :: (status: MIDI_Status) -> bool #expand {
+    return status >= .System_Exclusive && status <= .End_Of_System_Exclusive;
+}
+
 is_realtime_status :: (status: MIDI_Status) -> bool #expand {
-    return status >= .Timing_Clock && status <= .System_Reset;
+    return status >= .Timing_Clock;
 }
 
 MIDI_Status :: enum u8 {
@@ -293,16 +301,51 @@ encode_midi_message :: (message: MIDI_Message) -> [3] u8, int {
     return result, data_bytes + 1;
 }
 
-decode_midi_bytes :: (decoder: *MIDI_Decoder, bytes: [] u8) -> MIDI_Message, bool {
-    message: MIDI_Message;
+decode_midi_packet :: (input: *MIDI_Input, bytes: [] u8, timestamp: Apollo_Time) -> bool {
+    message, message_decoded := decode_midi_packet(*input.decoder, bytes);
+    if message_decoded  post_message_to_input(input, message, timestamp);
+    return message_decoded;
+}
 
-    if bytes.count == 0 {
-        assert(false, "Received empty byte array.");
-        return message, false;
-    }
+decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> MIDI_Message, bool {
+    message: MIDI_Message;
+    if bytes.count == 0  return message, false;
 
     status_byte := bytes[0];
     status := get_status(status_byte);
+
+    if is_realtime_status(status) {
+        message.status = status;
+        return message, true;
+    }
+
+    if status == .System_Exclusive || decoder.system_exclusive_message_in_progress {
+        #if VALIDATE_SYSTEM_EXCLUSIVE_BUFFERS {
+            for bytes {
+                if it_index == 0 && !decoder.system_exclusive_message_in_progress
+                    continue; // Skip the .System_Exclusive status byte.
+
+                if it != 0xf7 && it >= 0x80 {
+                    assert(false, "Unexpected byte value 0x% received in system-exclusive message.", formatInt(it, base=16));
+                    reset_system_exclusive_buffer(decoder);
+                    return message, false;
+                }
+            }
+        }
+
+        array_add(*decoder.message_buffer, ..bytes);
+        decoder.running_status = 0;
+
+        if get_status(bytes[bytes.count - 1]) == .End_Of_System_Exclusive {
+            decoder.system_exclusive_message_in_progress = false;
+            message = create_system_exclusive_message(decoder.message_buffer);
+            return message, true;
+        } else {
+            decoder.system_exclusive_message_in_progress = true;
+        }
+
+        return message, false;
+    }
 
     if status == .Invalid {
         if decoder.running_status == 0 {
@@ -312,35 +355,27 @@ decode_midi_bytes :: (decoder: *MIDI_Decoder, bytes: [] u8) -> MIDI_Message, boo
 
         status_byte = decoder.running_status;
         status = get_status(decoder.running_status);
-    } else {
-        if is_voice_status(status)      decoder.running_status = status_byte;
-        if status == .System_Exclusive  decoder.running_status = 0;
+    } else if is_voice_status(status) {
+        decoder.running_status = status_byte;
     }
 
-    if status == .System_Exclusive {
-        message.system_exclusive_info.buffer = bytes;
-    } else {
-        data_bytes := number_of_data_bytes(status);
-        if bytes.count - 1 < data_bytes {
-            log_error("Expected % bytes for % message, but only received % bytes.", data_bytes + 1, status, bytes.count);
-            return message, false;
-        }
-
-        for 0..data_bytes - 1  message.bytes[it] = bytes[1 + it];
+    data_bytes := number_of_data_bytes(status);
+    if bytes.count - 1 < data_bytes {
+        log_error("Expected % bytes for % message, but only received % bytes.", data_bytes + 1, status, bytes.count);
+        return message, false;
     }
 
     message.status = status;
     if status < .System_Exclusive  message.channel = status_byte & 0x0f;
+    for 0..data_bytes - 1  message.bytes[it] = bytes[1 + it];
 
     return message, true;
 }
 
-post_message_to_input :: (input: *MIDI_Input, _message: MIDI_Message, timestamp: Apollo_Time) {
-    message := _message;
-
-    if input.decoder.message_in_progress && message.status < .System_Exclusive {
+post_message_to_input :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time) {
+    if input.decoder.system_exclusive_message_in_progress && message.status < .System_Exclusive {
         reset_system_exclusive_buffer(*input.decoder);
-        input.decoder.message_in_progress = false;
+        input.decoder.system_exclusive_message_in_progress = false;
         log_verbose("System-exclusive message was interrupted.");
     }
 
@@ -349,49 +384,7 @@ post_message_to_input :: (input: *MIDI_Input, _message: MIDI_Message, timestamp:
 
 reset_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {
     array_reset_keeping_memory(*decoder.message_buffer);
-}
-
-handle_system_exclusive_message :: (input: *MIDI_Input, data: [] u8, error: bool) -> MIDI_Message, bool {
-    decoder := *input.decoder;
-    result: MIDI_Message;
-
-    if error {
-        if decoder.message_in_progress {
-            log_error("Discarding an invalid system-exclusive message (% bytes).", decoder.message_buffer.count);
-            decoder.message_in_progress = false;
-        }
-
-        return result, false;
-    }
-
-    if data.count == 0  return result, false;
-
-    start_status := get_status(data[0]);
-    end_status := get_status(data[data.count - 1]);
-
-    message_is_starting := start_status == .System_Exclusive;
-    message_is_complete := end_status == .End_Of_System_Exclusive;
-
-    if !decoder.message_in_progress {
-        // Start new system-exclusive message.
-        if !message_is_starting {
-            assert(false, "Given data does not start with a system-exclusive status byte (expected 0x%, but got 0x%).", formatInt(MIDI_Status.System_Exclusive, base=16), formatInt(start_status, base=16));
-            return result, false;
-        }
-
-        reset_system_exclusive_buffer(decoder);
-    }
-
-    array_add(*decoder.message_buffer, ..data);
-
-    decoder.message_in_progress = !message_is_complete;
-    decoder.running_status = 0;
-
-    message_ready := !decoder.message_in_progress;
-
-    if message_ready  result = create_system_exclusive_message(decoder.message_buffer);
-
-    return result, message_ready;
+    decoder.system_exclusive_message_in_progress = false;
 }
 
 log_verbose :: (format: string, args: ..Any) #expand {
