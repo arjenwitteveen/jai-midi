@@ -84,8 +84,7 @@ close_input :: (input: *MIDI_Input) {
         }
 
         MIDIPortDispose(input.port);
-
-        free(input);
+        free_input(input);
     }
 }
 

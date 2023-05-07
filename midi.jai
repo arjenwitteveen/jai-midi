@@ -90,20 +90,18 @@ get_destination_index_by_name :: (name: string, match_full_name := false) -> int
 }
 
 create_midi_message :: (bytes: [] u8) -> MIDI_Message, bool {
-    decoder: MIDI_Decoder;
-    result, success := decode_midi_packet(*decoder, bytes);
+    result, success := decode_midi_packet(bytes);
     return result, success;
 }
 
 create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, channel: u8 = 0) -> MIDI_Message, bool {
     assert(data0 <= MIDI_DATA_BYTE_MAX, "First data byte is out of range (value is %, but the maximum allowed value is %).", data0, MIDI_DATA_BYTE_MAX);
     assert(data1 <= MIDI_DATA_BYTE_MAX, "Second data byte is out of range (value is %, but the maximum allowed value is %).", data1, MIDI_DATA_BYTE_MAX);
-    decoder: MIDI_Decoder;
     bytes: [3] u8;
     bytes[0] = make_status_byte(status, channel);
     bytes[1] = data0;
     bytes[2] = data1;
-    result, success := decode_midi_packet(*decoder, bytes);
+    result, success := decode_midi_packet(bytes);
     return result, success;
 }
 
@@ -305,6 +303,12 @@ decode_midi_packet :: (input: *MIDI_Input, bytes: [] u8, timestamp: Apollo_Time)
     message, message_decoded := decode_midi_packet(*input.decoder, bytes);
     if message_decoded  post_message_to_input(input, message, timestamp);
     return message_decoded;
+}
+
+decode_midi_packet :: (bytes: [] u8) -> MIDI_Message, bool {
+    decoder: MIDI_Decoder;
+    message, message_decoded := decode_midi_packet(*decoder, bytes);
+    return message, message_decoded;
 }
 
 decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> MIDI_Message, bool {
