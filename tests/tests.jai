@@ -97,8 +97,8 @@ midi_encode_decode_test :: () {
     sysex_message := create_system_exclusive_message(sysex_data);
     assert_equal(sysex_message, decode_midi_packet(*decoder, sysex_data)); // We don't do encoding for system-exclusive messages, just test decoding.
 
-    quarter_frame_message := create_midi_message(.Time_Code_Quarter_Frame, 0x36);
-    test_message(quarter_frame_message, u8.[0xf1, 0x36]);
+    time_code_message := create_midi_message(.Time_Code, 0x36);
+    test_message(time_code_message, u8.[0xf1, 0x36]);
 
     song_position_message := create_midi_message(.Song_Position_Pointer, 0x01, 0x7f);
     test_message(song_position_message, u8.[0xf2, 0x01, 0x7f]);

@@ -161,7 +161,9 @@ open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
 }
 
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
-    if get_status(message[0]) == .System_Exclusive {
+    status := get_status(message[0]);
+
+    if status == .System_Exclusive {
         request: MIDISysexSendRequest;
         request.destination = output.destination_endpoint;
 
@@ -188,7 +190,10 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     message_word_count := cast(u64) (align_forward(message.count, 4) / 4);
     assert(message_word_count == 1);
 
-    word := make_ump_word(0, message[0], message[1], ifx message.count > 2 then message[2] else 0);
+    ump_message_type := UMP_Message_Type.MIDI_1_Voice;
+    if is_realtime_status(status)  ump_message_type = .System_Common_Or_Real_Time;
+
+    word := make_ump_word(ump_message_type, 0, message[0], message[1], ifx message.count > 2 then message[2] else 0);
 
     packet = MIDIEventListAdd(*event_list, size_of(MIDIEventList), packet, 0 /* timestamp */, 1, *word);
     assert(packet != null);
@@ -216,7 +221,7 @@ MIDI_Input_Platform_Data :: struct {
 
     ump_system_exclusive_buffer: [256] u8;
     ump_system_exclusive_buffer_count: int;
-    ump_system_exclusive_status := UMP_System_Exclusive_Message_Status.Invalid;
+    // ump_system_exclusive_status := UMP_System_Exclusive_Status.Invalid;
     ump_system_exclusive_bytes_to_read: u8;
 
     input_block: Objective_C_Block_MIDI_Input;
@@ -300,6 +305,7 @@ midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIE
         assert(event_list.protocol == xx kMIDIProtocol._1_0, "Received event list using an unsupported MIDI protocol.");
         assert(input != null, "Invalid input pointer.");
 
+        // @Note: The thing that is called a 'packet' in CoreMIDI can actually contain multiple UMPs!
         packet := event_list.packet.data;
         end_packet := packet + event_list.numPackets;
 
@@ -309,148 +315,16 @@ midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIE
             timestamp: Apollo_Time;
             if packet.timeStamp  timestamp = mach_timestamp_to_apollo_time(packet.timeStamp - input.time_base);
 
-            word := packet.words.data;
-            end_word := word + packet.wordCount;
+            words: [] u32 = ---;
+            words.data = packet.words.data;
+            words.count = packet.wordCount;
 
-            sysex_bytes_to_read: u8;
-
-            while word != end_word {
-                ump_bytes := ump_word_to_bytes(<<word);
-                ump_message_type := cast(UMP_Message_Type) (ump_bytes[0] >> 4);
-
-                if ump_message_type == .System_Exclusive_Data {
-                    words_read := handle_ump_sysex_event_list(input, word, end_word);
-                    word += words_read;
-
-                    if !input.decoder.system_exclusive_message_in_progress {
-                        message := create_system_exclusive_message(input.decoder.message_buffer);
-                        post_message_to_input(input, message, timestamp);
-                        reset_system_exclusive_buffer(*input.decoder);
-                    }
-                } else {
-                    midi_bytes: [] u8 = ump_bytes;
-                    midi_bytes.data += 1;
-                    midi_bytes.count -= 1;
-                    decode_midi_packet(input, midi_bytes, timestamp);
-                    word += 1;
-                }
+            while words.count {
+                message, message_decoded := decode_ump_words(*input.decoder, *words);
+                if message_decoded  post_message_to_input(input, message, timestamp);
             }
         }
     }
-}
-
-slice :: (array: [] $T, start_index: int) -> [] T {
-    assert(start_index >= 0 && start_index <= array.count);
-    result: [] T = ---;
-    result.data = array.data + start_index;
-    result.count = array.count - start_index;
-    return result;
-}
-
-slice :: (array: [] $T, start_index: int, count: int) -> [] T {
-    assert(start_index >= 0 && start_index <= array.count && count <= (array.count - start_index));
-    result: [] T = ---;
-    result.data = array.data + start_index;
-    result.count = count;
-    return result;
-}
-
-handle_ump_sysex_event_list :: (input: *MIDI_Input, start_word: *u32, end_word: *u32) -> int {
-    decoder := *input.decoder;
-    word := start_word;
-
-    append_bytes :: (bytes: [] u8, number_of_bytes: int) #expand {
-        if number_of_bytes == 0  return;
-
-        sysex_bytes_to_copy := min(number_of_bytes, 2);
-        array_add(*decoder.message_buffer, ..slice(bytes, 2, sysex_bytes_to_copy)); // Add the first two bytes.
-        number_of_bytes -= sysex_bytes_to_copy;
-        while number_of_bytes > 0 {
-            `word += 1;
-            sysex_bytes_to_copy = min(number_of_bytes, 4);
-            array_add(*decoder.message_buffer, ..slice(ump_word_to_bytes(<<word), 0, sysex_bytes_to_copy));
-            number_of_bytes -= sysex_bytes_to_copy;
-        }
-    }
-
-    while word != end_word {
-        bytes := ump_word_to_bytes(<<word);
-
-        assert((cast(UMP_Message_Type) (bytes[0] >> 4)) == .System_Exclusive_Data);
-
-        sysex_status := cast(UMP_System_Exclusive_Message_Status) (bytes[1] >> 4);
-        number_of_bytes := bytes[1] & 0xf;
-
-        if sysex_status == .Start || sysex_status == .Complete_In_One_UMP {
-            assert(!decoder.system_exclusive_message_in_progress);
-            reset_system_exclusive_buffer(decoder);
-            decoder.system_exclusive_message_in_progress = true;
-            array_add(*decoder.message_buffer, cast(u8) MIDI_Status.System_Exclusive);
-        }
-
-        append_bytes(bytes, number_of_bytes);
-
-        if sysex_status == .Complete_In_One_UMP || sysex_status == .End {
-            array_add(*decoder.message_buffer, cast(u8) MIDI_Status.End_Of_System_Exclusive);
-            decoder.system_exclusive_message_in_progress = false;
-        }
-
-        word += 1;
-    }
-
-    return word - start_word;
-}
-
-make_ump_word :: (group: u32, status_channel: u32, data1: u32, data2: u32) -> u32 #expand {
-    return (((0x2 << 4) | (group & 0xf)) << 24) | (status_channel << 16) | ((data1 & 0x7f) << 8) | (data2 & 0x7f);
-}
-
-ump_word_to_bytes :: (ump: u32) -> [4] u8 #expand {
-    ump_word_reversed := byte_swap(ump);
-    result: [4] u8;
-    memcpy(result.data, cast(*u8) *ump_word_reversed, 4);
-    return result;
-}
-
-UMP_Message_Type :: enum u8 {
-    Utility                     :: 0x0;
-    Real_Time_And_System_Common :: 0x1;
-    Channel_Voice               :: 0x2;
-    System_Exclusive_Data       :: 0x3;
-    MIDI2_Channel_Voice         :: 0x4;
-    Data                        :: 0x5;
-}
-
-UMP_System_Exclusive_Message_Status :: enum u8 {
-    Complete_In_One_UMP :: 0x0;
-    Start               :: 0x1;
-    Continue            :: 0x2;
-    End                 :: 0x3;
-
-    Invalid             :: 0xff;
-}
-
-UMP_Message :: struct {
-    type: UMP_Message_Type;
-    group: u8;
-    midi_bytes: [] u8;
-}
-
-decode_ump_bytes :: (decoder: *MIDI_Decoder, bytes: [] u8) -> UMP_Message, bool {
-    message: UMP_Message;
-
-    if bytes.count < 3 {
-        assert(false, "Received invalid MIDI data.");
-        return message, false;
-    }
-
-    message.type = xx (bytes[0] >> 4);
-    message.group = bytes[0] & 0xf;
-    message.midi_bytes = bytes;
-    message.midi_bytes.data += 1;
-    message.midi_bytes.count -= 1;
-
-    return message, true;
 }
 
 init_macos :: () -> bool {
@@ -533,5 +407,7 @@ mach_timestamp_to_apollo_time :: (timestamp: u64) -> Apollo_Time #expand {
 }
 
 #load "bindings/macos.jai";
+#load "ump.jai";
+
 #import "Objective_C";
 #import "Bit_Operations"; // For byte_swap.

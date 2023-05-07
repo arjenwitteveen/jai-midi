@@ -38,7 +38,7 @@ MIDI_Message :: struct {
         channel_pressure_info: MIDI_Channel_Pressure_Info;
         pitch_bend_info: MIDI_Pitch_Bend_Info;
         system_exclusive_info: MIDI_System_Exclusive_Info;
-        quarter_frame_info: MIDI_Quarter_Frame_Info;
+        time_code_info: MIDI_Time_Code_Info;
         song_position_pointer_info: MIDI_Song_Position_Pointer_Info;
         song_request_info: MIDI_Song_Request_Info;
     }
@@ -51,7 +51,7 @@ MIDI_Program_Change_Info        :: struct { program: u8; }
 MIDI_Channel_Pressure_Info      :: struct { pressure: u8; }
 MIDI_Pitch_Bend_Info            :: struct { fine: u8; coarse: u8; }
 MIDI_System_Exclusive_Info      :: struct { buffer: [] u8; }
-MIDI_Quarter_Frame_Info         :: struct { data: u8; }
+MIDI_Time_Code_Info             :: struct { data: u8; }
 MIDI_Song_Position_Pointer_Info :: struct { pointer_lsb: u8; pointer_msb: u8; }
 MIDI_Song_Request_Info          :: struct { song: u8; }
 
@@ -213,7 +213,7 @@ MIDI_Status :: enum u8 {
 
     // System common messages.
     System_Exclusive        :: 0xf0;
-    Time_Code_Quarter_Frame :: 0xf1;
+    Time_Code               :: 0xf1;
     Song_Position_Pointer   :: 0xf2;
     Song_Select             :: 0xf3;
     Tune_Request            :: 0xf6;
@@ -286,7 +286,7 @@ free_input :: (input: *MIDI_Input) {
 
 number_of_data_bytes :: (status: MIDI_Status) -> int {
     if status == .System_Exclusive || status == .Tune_Request || is_realtime_status(status)  return 0;
-    if status == .Channel_Pressure || status == .Program_Change || status == .Time_Code_Quarter_Frame || status == .Song_Select return 1;
+    if status == .Channel_Pressure || status == .Program_Change || status == .Time_Code || status == .Song_Select return 1;
     return 2;
 }
 
@@ -311,7 +311,7 @@ decode_midi_packet :: (bytes: [] u8) -> MIDI_Message, bool {
     return message, message_decoded;
 }
 
-decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> MIDI_Message, bool {
+decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := false) -> MIDI_Message, bool {
     message: MIDI_Message;
     if bytes.count == 0  return message, false;
 
@@ -337,7 +337,8 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> MIDI_Message, bo
             }
         }
 
-        array_add(*decoder.message_buffer, ..bytes);
+        // We skip the copy if we're handling UMP messages; in that case the bytes have already been placed in the buffer.
+        if !skip_copy_bytes  array_add(*decoder.message_buffer, ..bytes);
         decoder.running_status = 0;
 
         if get_status(bytes[bytes.count - 1]) == .End_Of_System_Exclusive {
