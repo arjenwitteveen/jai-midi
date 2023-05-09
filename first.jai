@@ -81,10 +81,13 @@ do_examples :: (build: bool, clean: bool) {
             w := compiler_create_workspace(file_name_without_extension);
             options := get_build_options(w);
             copy_commonly_propagated_fields(get_build_options(), *options);
+
             options.intermediate_path = intermediate_path;
             options.output_path = EXAMPLES_PATH;
             options.output_type = .EXECUTABLE;
             options.output_executable_name = file_name_without_extension;
+            options.minimum_macos_version = .{12, 0};
+
             set_build_options(options, w);
 
             compiler_begin_intercept(w);

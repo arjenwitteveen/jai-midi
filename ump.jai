@@ -1,22 +1,5 @@
-/*
-
-- UMP uses 16 'groups', which each have independent system messages and (16) channels.
-
-- Optional: per-packet jitter reduction timestamp prepended to message.
-
-- Each UMP consists of 1, 2, 3, or 4 u32s.
-- Each UMP contains one entire MIDI message (except for Data Messages longer than 128 bits).
-- Each UMP contains a message type (4 bits), group (4 bits), and status field.
-- UMPs addressed to different groups may be freely interleaved.
-
-- Each group can select which version of the MIDI protocol to use independently.
-
-- For MIDI 2.0 note on messages, a velocity of 0 does not mean 'note off'. When translating to MIDI 1.0, use a note on
-  message with a velocity of 1 instead of 0.
-
-- For MIDI 1.0 style system-exclusive messages, the start/end (0xf0/0xf7) bytes are not included in the payload in UMP.
-
-*/
+// This file contains some procedures for dealing with Universal MIDI Packets (UMP), which is the new message format
+// used for MIDI 2.0. The main reason for having this code is that Apple's CoreMIDI API uses this message format.
 
 make_ump_word :: (message_type: UMP_Message_Type, group: u32, status_channel: u32, data1: u32, data2: u32) -> u32 #expand {
     result: u32;
@@ -32,7 +15,7 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
 
     word := words.data[0];
     message_type := cast(UMP_Message_Type) (word >> 28);
-    group := (word >> 24) & 0xf;
+    group := (word >> 24) & 0xf; // @Incomplete: We actually ignore the group value, since that is a MIDI 2.0 concept.
 
     num_words_decoded := 1;
 
@@ -41,10 +24,11 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
         words.count -= num_words_decoded;
     }
 
-    if message_type == {
+    if #complete  message_type == {
         case .Utility; {
             status_byte := cast(u8) ((word >> 20) & 0xf);
-            // @Incomplete: Currently not handled.
+            // @Incomplete: Currently not handled. One use of utility messages is to transmit timestamps that can be
+            // used for jitter reduction.
         }
 
         case .System_Common_Or_Real_Time; #through;
@@ -58,7 +42,10 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
             return message, message_decoded;
         }
 
-        case .Data; {
+        case .Data_System_Exclusive; {
+            // @Note: The start/end marker bytes for system-exclusive messages are not included in the payload in
+            // UMPs. We add them in manually, to make the output the same as in MIDI 1.0.
+
             status_byte               := cast(u8) ((word >> 20) & 0xf);
             number_of_bytes_in_packet := cast(u8) ((word >> 16) & 0xf);
             status := cast(UMP_System_Exclusive_Status) status_byte;
@@ -110,7 +97,13 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
             return message, message_decoded;
         }
 
-        case; {
+        case .MIDI_2_Voice; {
+            // @Incomplete: MIDI 2.0 voice messages.
+            assert(false, "Messages of type % are not currently supported.", message_type);
+        }
+
+        case .Data; {
+            // @Incomplete: MIDI 2.0 data messages (8-bit system exclusive or mixed data set).
             assert(false, "Messages of type % are not currently supported.", message_type);
         }
     }
@@ -120,11 +113,11 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
 
 UMP_Message_Type :: enum u8 {
     Utility                    :: 0x0;
-    System_Common_Or_Real_Time :: 0x1; // Messages are always 32-bit.
-    MIDI_1_Voice               :: 0x2; // Messages are always 32-bit. MIDI 1.0 only.
-    Data                       :: 0x3; // Messages are 32-bit or 64-bit.
-    MIDI_2_Voice               :: 0x4; // Messages are always 64-bit. MIDI 2.0 only.
-    Data_128                   :: 0x5;
+    System_Common_Or_Real_Time :: 0x1;
+    MIDI_1_Voice               :: 0x2;
+    Data_System_Exclusive      :: 0x3;
+    MIDI_2_Voice               :: 0x4;
+    Data                       :: 0x5;
 }
 
 // Statuses used for 7-bit system-exclusive messages in UMPs.
@@ -140,5 +133,3 @@ UMP_Utility_Status :: enum u8 {
     Jitter_Reduction_Clock     :: 0x1;
     Jitter_Reduction_Timestamp :: 0x2;
 }
-
-#import "Bit_Operations"; // For byte_swap.

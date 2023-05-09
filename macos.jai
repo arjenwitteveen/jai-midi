@@ -24,8 +24,7 @@ get_source_name :: (index: int) -> string {
     if endpoint {
         cfstring: CFStringRef;
         result := MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, *cfstring);
-        if result == 0  return cfstring_to_string(cfstring);
-        // Error.
+        if result == noErr  return cfstring_to_string(cfstring);
     }
 
     return "";
@@ -37,15 +36,14 @@ get_destination_name :: (index: int) -> string {
     if endpoint {
         cfstring: CFStringRef;
         result := MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, *cfstring);
-        if result == 0  return cfstring_to_string(cfstring);
-        // Error.
+        if result == noErr  return cfstring_to_string(cfstring);
     }
 
     return "";
 }
 
 open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
-    init_macos(); // @TODO: Check result;
+    if !init_macos() return null;
 
     source_endpoint := MIDIGetSource(xx source_index);
     if !source_endpoint {
@@ -64,9 +62,9 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     init_input_port(*input.port, "input_port", *input.input_block);
 
     result := MIDIPortConnectSource(input.port, input.source_endpoint, null);
-    assert(result == 0, "Error in MIDIPortConnectSource (%)", result);
+    assert(result == noErr, "Error in MIDIPortConnectSource (return code was %).", result);
 
-    if result {
+    if result != noErr {
         free(input);
         return null;
     }
@@ -78,18 +76,22 @@ close_input :: (input: *MIDI_Input) {
     if input {
         if input.virtual_endpoint {
             assert(input.source_endpoint == 0, "The given input seems to be a virtual input, but for some reason it has a regular source endpoint set.");
-            result := MIDIEndpointDispose(input.virtual_endpoint); // @TODO: Check result.
+            result := MIDIEndpointDispose(input.virtual_endpoint);
+            assert(result == noErr, "Error in MIDIEndpointDispose (return code was %).", result);
         } else {
-            result := MIDIPortDisconnectSource(input.port, input.source_endpoint); // @TODO: Check result.
+            result := MIDIPortDisconnectSource(input.port, input.source_endpoint);
+            assert(result == noErr, "Error in MIDIPortDisconnectSource (return code was %).", result);
         }
 
-        MIDIPortDispose(input.port);
+        result := MIDIPortDispose(input.port);
+        assert(result == noErr, "Error in MIDIPortDispose (return code was %).", result);
+
         free_input(input);
     }
 }
 
 open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
-    init_macos();
+    if !init_macos() return null;
 
     input := New(MIDI_Input);
     input.index = -1;
@@ -100,7 +102,7 @@ open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_d
 
     cf_input_name := make_cf_string(input_name);
     result := MIDIDestinationCreateWithProtocol(core_midi_client, cf_input_name, xx kMIDIProtocol._1_0, *input.virtual_endpoint, xx *input.input_block);
-    assert(result == 0, "Error in MIDIDestinationCreateWithProtocol (%)", result);
+    assert(result == noErr, "Error in MIDIDestinationCreateWithProtocol (return code was %).", result);
 
     if result {
         free(input);
@@ -111,7 +113,7 @@ open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_d
 }
 
 open_output :: (destination_index: int) -> *MIDI_Output #must {
-    init_macos(); // @TODO: Check result;
+    if !init_macos() return null;
 
     destination_endpoint := MIDIGetDestination(xx destination_index);
     if !destination_endpoint {
@@ -132,17 +134,18 @@ close_output :: (output: *MIDI_Output, reset_all_notes := false) {
     if output {
         if output.virtual_endpoint {
             assert(output.destination_endpoint == 0, "The given output seems to be a virtual output, but for some reason it has a regular destination endpoint set.");
-            result := MIDIEndpointDispose(output.virtual_endpoint); // @TODO: Check result.
+            result := MIDIEndpointDispose(output.virtual_endpoint);
+            assert_coremidi("MIDIEndpointDispose", result);
         }
 
-        MIDIPortDispose(output.port);
-
+        result := MIDIPortDispose(output.port);
+        assert_coremidi("MIDIPortDispose", result);
         free(output);
     }
 }
 
 open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
-    init_macos();
+    if !init_macos() return null;
 
     output := New(MIDI_Output);
     output.index = -1;
@@ -150,7 +153,7 @@ open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
 
     cf_output_name := make_cf_string(output_name);
     result := MIDISourceCreateWithProtocol(core_midi_client, cf_output_name, xx kMIDIProtocol._1_0, *output.virtual_endpoint);
-    assert(result == 0, "Error in MIDISourceCreateWithProtocol (%)", result);
+    assert_coremidi("MIDISourceCreateWithProtocol", result);
 
     if result {
         free(output);
@@ -173,16 +176,14 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
         err := MIDISendSysex(*request);
         if err  return false;
 
-        // MIDISendSysex works asynchronously. We could roll with that, but then we need to keep the MIDISysexSendRequest
-        // alive somewhere, configure a callback for completion and then release the request. Meh.
+        // @Hack @Speed MIDISendSysex works asynchronously. We could roll with that, but then we need to keep the
+        // MIDISysexSendRequest alive somewhere, configure a callback for completion and then free the request. Meh.
         while !request.complete {
             sleep_milliseconds(1);
         }
 
         return true;
     }
-
-    result: OSStatus;
 
     event_list: MIDIEventList;
     packet := MIDIEventListInit(*event_list, xx kMIDIProtocol._1_0);
@@ -198,38 +199,28 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     packet = MIDIEventListAdd(*event_list, size_of(MIDIEventList), packet, 0 /* timestamp */, 1, *word);
     assert(packet != null);
 
-    send_result: OSStatus;
+    result: OSStatus;
     if output.virtual_endpoint {
-        send_result = MIDIReceivedEventList(output.virtual_endpoint, *event_list);
+        result = MIDIReceivedEventList(output.virtual_endpoint, *event_list);
+        assert_coremidi("MIDIReceivedEventList", result);
     } else {
-        send_result = MIDISendEventList(output.port, output.destination_endpoint, *event_list);
+        result = MIDISendEventList(output.port, output.destination_endpoint, *event_list);
+        assert_coremidi("MIDISendEventList", result);
     }
 
-    if send_result {
-        log_error("Error in MIDIReceivedEventList: %.", send_result);
-    }
-
-    return result == 0;
+    return result == noErr;
 }
 
 MIDI_Input_Platform_Data :: struct {
     port: MIDIPortRef;
-
     source_endpoint: MIDIEndpointRef;
     virtual_endpoint: MIDIEndpointRef;
     time_base: u64;
-
-    ump_system_exclusive_buffer: [256] u8;
-    ump_system_exclusive_buffer_count: int;
-    // ump_system_exclusive_status := UMP_System_Exclusive_Status.Invalid;
-    ump_system_exclusive_bytes_to_read: u8;
-
     input_block: Objective_C_Block_MIDI_Input;
 }
 
 MIDI_Output_Platform_Data :: struct {
     port: MIDIPortRef;
-
     destination_endpoint: MIDIEndpointRef;
     virtual_endpoint: MIDIEndpointRef;
     time_base: u64;
@@ -263,14 +254,14 @@ get_endpoint_info :: (endpoint: MIDIEndpointRef) -> MIDI_Endpoint_Info, bool {
     get_string_property :: (property: CFStringRef) -> string #expand {
         value: CFStringRef;
         status := MIDIObjectGetStringProperty(endpoint, property, *value);
-        if status == 0  return cfstring_to_string(value);
+        if status == noErr  return cfstring_to_string(value);
         return "";
     }
 
     get_integer_property :: (property: CFStringRef) -> int #expand {
         value: s32;
         status := MIDIObjectGetIntegerProperty(endpoint, property, *value);
-        if status == 0  return value;
+        if status == noErr  return value;
         return 0;
     }
 
@@ -296,6 +287,7 @@ Objective_C_Block_MIDI_Input :: struct {
 core_midi_client: MIDIClientRef;
 
 mach_timebase: mach_timebase_info;
+mach_timebase_valid := false;
 
 midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
     input := block.input;
@@ -336,13 +328,19 @@ init_macos :: () -> bool {
 
          // @Note: Possibly we should use MIDIClientCreateWithBlock to receive MIDI system state change notifications.
         result := MIDIClientCreate(cfstring, null, null, *core_midi_client);
+        assert_coremidi("MIDIClientCreate", result);
+        success := result == noErr;
+        if !success  log_error("Could not create CoreMIDI client.");
 
-        success := result == 0;
-
-        mach_timebase_info_(*mach_timebase);
+        if mach_timebase_info_(*mach_timebase) == .SUCCESS {
+            mach_timebase_valid = true;
+        } else {
+            log_error("Could not retrieve system timing information.");
+        }
 
         return success;
     }
+
     return true;
 }
 
@@ -358,14 +356,14 @@ init_input_block :: (input: *MIDI_Input) {
 init_input_port :: (port: *MIDIPortRef, name: string, input_block: *Objective_C_Block_Basic) -> bool {
     port_name := make_cf_string(name);
     result := MIDIInputPortCreateWithProtocol(core_midi_client, port_name, xx kMIDIProtocol._1_0, port, xx input_block);
-    assert(result == 0, "Error in MIDIInputPortCreateWithProtocol (%)", result);
+    assert_coremidi("MIDIInputPortCreateWithProtocol", result);
     return result == 0;
 }
 
 init_output_port :: (port: *MIDIPortRef, name: string) -> bool {
     port_name := make_cf_string(name);
     result := MIDIOutputPortCreate(core_midi_client, port_name, port);
-    assert(result == 0, "Error in MIDIOutputPortCreate (%)", result);
+    assert_coremidi("MIDIOutputPortCreate", result);
     return result == 0;
 }
 
@@ -401,9 +399,17 @@ cfstring_to_string :: (cfstring: CFStringRef) -> string {
 }
 
 mach_timestamp_to_apollo_time :: (timestamp: u64) -> Apollo_Time #expand {
-    // @Incomplete: This is probably not the most accurate way of converting.
-    time_milliseconds := (timestamp * mach_timebase.numer) / (1_000_000 * mach_timebase.denom);
-    return milliseconds_to_apollo(cast(s64) time_milliseconds);
+    if mach_timebase_valid {
+        // @Incomplete: This is probably not the most accurate way of converting.
+        time_milliseconds := (timestamp * mach_timebase.numer) / (1_000_000 * mach_timebase.denom);
+        return milliseconds_to_apollo(cast(s64) time_milliseconds);
+    }
+
+    return .{};
+}
+
+assert_coremidi :: (procedure_name: string, result: OSStatus) #expand {
+    assert(result == noErr, "Error in % (return code was %).", procedure_name, result);
 }
 
 #load "bindings/macos.jai";
