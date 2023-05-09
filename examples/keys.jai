@@ -105,7 +105,7 @@ main :: () {
         }
 
         if selected_source != connected_source {
-            close_input(input);
+            close_input(input); input = null;
             source_index := selected_source - 1; // The first item in the dropdown is a dummy, hence the minus 1.
 
             clear_pressed_keys();
