@@ -185,8 +185,8 @@ draw_one_frame :: () {
 }
 
 draw_keyboard :: () {
-    PIANO_MIDI_START_INDEX ::  21; // A-1
-    PIANO_MIDI_END_INDEX   :: 108; // C7
+    PIANO_MIDI_START_INDEX ::  21;
+    PIANO_MIDI_END_INDEX   :: 108;
 
     key_padding := 2.0;
     keyboard_rect := get_rect(PADDING, PADDING, window_width - 2 * PADDING, KEYBOARD_HEIGHT);
