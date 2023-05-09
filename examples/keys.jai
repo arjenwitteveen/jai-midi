@@ -21,6 +21,8 @@ BACKGROUND_COLOR :: Vector4.{0.11, 0.11, 0.11, 1.0};
 ACTIVE_COLOR     :: Vector4.{0.9, 0.45, 0.2, 1.0};
 GAUGE_COLOR      :: Vector4.{0.3, 0.1, 0.1, 1.0};
 
+KEY_NAMES :: string.["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
 my_window: Window_Type;
 window_width:  s32 = 1280;
 window_height: s32 = 400;
@@ -176,6 +178,7 @@ draw_one_frame :: () {
 
     draw_gauges();
     draw_keyboard();
+    draw_note_names();
     draw_popups();
 
     Simp.swap_buffers(my_window);
@@ -264,6 +267,33 @@ draw_gauges :: () {
     label_rect = rect;
     label_rect.y += rect.h;
     label(label_rect, tprint("CC %: %", cc_index, formatFloat(cc_value, trailing_width=2, zero_removal=.NO)), *label_theme);
+}
+
+draw_note_names :: () {
+    label_theme: Label_Theme;
+    label_theme.alignment = .Center;
+ 	label_theme.text_color = .{.8, .8, .8, 1};
+    label_theme.alignment_pad_ems = 0.0;
+
+    label_height := 70.0;
+    label_rect := get_rect(0, window_height - 0.5 * (window_height - KEYBOARD_HEIGHT + label_height), xx window_width, label_height);
+
+    builder: String_Builder;
+    first_key := true;
+
+    for pressed_keys {
+        if it {
+            octave := it_index / 12;
+            key := it_index % 12;
+
+            if !first_key  print_to_builder(*builder, ", ");
+            print_to_builder(*builder, "%0%0", KEY_NAMES[key], octave);
+            first_key = false;
+        }
+    }
+
+    label(label_rect, builder_to_string(*builder), *label_theme);
+
 }
 
 immediate_rect :: (rect: Rect, color: Vector4) {
