@@ -408,7 +408,7 @@ midi_input_thread :: (thread: *Thread) -> s64 {
             midi_event_bytes.count = number_of_bytes;
 
             timestamp := seconds_to_apollo(event.time.time.tv_sec) + nanoseconds_to_apollo(event.time.time.tv_nsec);
-            decode_midi_bytes(input, midi_event_bytes, timestamp);
+            decode_midi_packet(input, midi_event_bytes, timestamp);
         }
 
         if thread_notification_pollfd.revents & POLLIN { // Our own event to stop the thread.
