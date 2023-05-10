@@ -114,7 +114,6 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     init(*result.thread_start_semaphore);
 
     // Create thread to handle callbacks.
-    // @Speed: Once the Thread module supports it, we should probably set the thread priority.
     thread_init_success := thread_init(*result.thread, midi_input_thread);
     if !thread_init_success {
         log_error("Could not initialize callback thread.");
@@ -136,8 +135,6 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
         return null;
     }
 
-    log_verbose("Opened input on % %:%.", port_info.client_name, sender.client, sender.port);
-
     success = true; // Needed in the defer handler!
 
     return result;
@@ -145,8 +142,6 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
 
 close_input :: (using input: *MIDI_Input) {
     if input == null  return;
-
-    source_index := index; // Store to be able to log the index after freeing the input.
 
     // Shudown callback thread.
     if input.thread.index {
@@ -181,8 +176,6 @@ close_input :: (using input: *MIDI_Input) {
     }
 
     free_input(input);
-
-    if source_index >= 0  log_verbose("Closed MIDI input for source %.", source_index);
 }
 
 open_output :: (destination_index: int) -> *MIDI_Output #must {
@@ -276,10 +269,9 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     snd_seq_ev_set_subs(*event);
     snd_seq_ev_set_direct(*event);
 
-    if message[0] == 0xf0 {
-        assert(message.count >= 2);
-        assert(message[0] == 0xf0 && message[message.count - 1] == 0xf7, "Given system-exclusive buffer is not in a correct format.");
+    status := get_status(message[0]);
 
+    if status == .System_Exclusive {
         total_bytes_written: int;
         while total_bytes_written < message.count {
             bytes_written := snd_midi_event_encode(encoder, message.data + total_bytes_written, message.count - total_bytes_written, *event);

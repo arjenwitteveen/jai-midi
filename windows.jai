@@ -63,8 +63,6 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     start_result := midiInStart(result.handle);
     if error_in(start_result, "Unable to start MIDI input")  return null;
 
-    log_verbose("Opened MIDI input for source %.", source_index);
-
     success = true; // Needed in the defer handler!
 
     return result;
@@ -78,7 +76,6 @@ close_input :: (input: *MIDI_Input) {
     deinit_sysex_buffers(input);
     close_result := midiInClose(input.handle);
     free_input(input);
-    log_verbose("Closed MIDI input for device %.", index);
 }
 
 open_output :: (destination_index: int) -> *MIDI_Output #must {
@@ -97,7 +94,6 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
         return null;
     }
 
-    log_verbose("Opened MIDI output for device %.", destination_index);
     return result;
 }
 
@@ -107,7 +103,6 @@ close_output :: (output: *MIDI_Output) {
     mmresult := midiOutClose(output.handle);
     if mmresult != .NOERROR  log_error("Error closing MIDI output: %.", mmresult);
     free(output);
-    log_verbose("Closed MIDI output for device %.", index);
 }
 
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {

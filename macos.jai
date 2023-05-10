@@ -20,7 +20,6 @@ get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
 
 get_source_name :: (index: int) -> string {
     endpoint := MIDIGetSource(cast(u32) index);
-
     if endpoint {
         cfstring: CFStringRef;
         result := MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, *cfstring);
@@ -32,7 +31,6 @@ get_source_name :: (index: int) -> string {
 
 get_destination_name :: (index: int) -> string {
     endpoint := MIDIGetDestination(cast(u32) index);
-
     if endpoint {
         cfstring: CFStringRef;
         result := MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, *cfstring);
@@ -59,35 +57,20 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     input.time_base = mach_absolute_time();
 
     init_input_block(input);
-    init_input_port(*input.port, "input_port", *input.input_block);
+    if !init_input_port(*input.port, "input_port", *input.input_block) {
+        close_input(input);
+        return null;
+    }
 
     result := MIDIPortConnectSource(input.port, input.source_endpoint, null);
-    assert(result == noErr, "Error in MIDIPortConnectSource (return code was %).", result);
+    assert_coremidi("MIDIPortConnectSource", result);
 
     if result != noErr {
-        free(input);
+        close_input(input);
         return null;
     }
 
     return input;
-}
-
-close_input :: (input: *MIDI_Input) {
-    if input {
-        if input.virtual_endpoint {
-            assert(input.source_endpoint == 0, "The given input seems to be a virtual input, but for some reason it has a regular source endpoint set.");
-            result := MIDIEndpointDispose(input.virtual_endpoint);
-            assert(result == noErr, "Error in MIDIEndpointDispose (return code was %).", result);
-        } else {
-            result := MIDIPortDisconnectSource(input.port, input.source_endpoint);
-            assert(result == noErr, "Error in MIDIPortDisconnectSource (return code was %).", result);
-        }
-
-        result := MIDIPortDispose(input.port);
-        assert(result == noErr, "Error in MIDIPortDispose (return code was %).", result);
-
-        free_input(input);
-    }
 }
 
 open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
@@ -102,14 +85,34 @@ open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_d
 
     cf_input_name := make_cf_string(input_name);
     result := MIDIDestinationCreateWithProtocol(core_midi_client, cf_input_name, xx kMIDIProtocol._1_0, *input.virtual_endpoint, xx *input.input_block);
-    assert(result == noErr, "Error in MIDIDestinationCreateWithProtocol (return code was %).", result);
+    assert_coremidi("MIDIDestinationCreateWithProtocol", result);
 
-    if result {
-        free(input);
+    if result != noErr {
+        close_input(input);
         return null;
     }
 
     return input;
+}
+
+close_input :: (input: *MIDI_Input) {
+    if input {
+        if input.virtual_endpoint {
+            assert(input.source_endpoint == 0, "The given input seems to be a virtual input, but for some reason it has a regular source endpoint set.");
+            result := MIDIEndpointDispose(input.virtual_endpoint);
+            assert_coremidi("MIDIEndpointDispose", result);
+        } else if input.source_endpoint {
+            result := MIDIPortDisconnectSource(input.port, input.source_endpoint);
+            assert_coremidi("MIDIPortDisconnectSource", result);
+        }
+
+        if input.port {
+            result := MIDIPortDispose(input.port);
+            assert_coremidi("MIDIPortDispose", result);
+        }
+
+        free_input(input);
+    }
 }
 
 open_output :: (destination_index: int) -> *MIDI_Output #must {
@@ -125,23 +128,13 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
     output.index = destination_index;
     output.destination_endpoint = destination_endpoint;
     output.time_base = mach_absolute_time();
-    init_output_port(*output.port, "output_port");
+
+    if !init_output_port(*output.port, "output_port") {
+        close_output(output);
+        return null;
+    }
 
     return output;
-}
-
-close_output :: (output: *MIDI_Output, reset_all_notes := false) {
-    if output {
-        if output.virtual_endpoint {
-            assert(output.destination_endpoint == 0, "The given output seems to be a virtual output, but for some reason it has a regular destination endpoint set.");
-            result := MIDIEndpointDispose(output.virtual_endpoint);
-            assert_coremidi("MIDIEndpointDispose", result);
-        }
-
-        result := MIDIPortDispose(output.port);
-        assert_coremidi("MIDIPortDispose", result);
-        free(output);
-    }
 }
 
 open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
@@ -155,12 +148,29 @@ open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
     result := MIDISourceCreateWithProtocol(core_midi_client, cf_output_name, xx kMIDIProtocol._1_0, *output.virtual_endpoint);
     assert_coremidi("MIDISourceCreateWithProtocol", result);
 
-    if result {
-        free(output);
+    if result != noErr {
+        close_output(output);
         return null;
     }
 
     return output;
+}
+
+close_output :: (output: *MIDI_Output, reset_all_notes := false) {
+    if output {
+        if output.virtual_endpoint {
+            assert(output.destination_endpoint == 0, "The given output seems to be a virtual output, but for some reason it has a regular destination endpoint set.");
+            result := MIDIEndpointDispose(output.virtual_endpoint);
+            assert_coremidi("MIDIEndpointDispose", result);
+        }
+
+        if output.port {
+            result := MIDIPortDispose(output.port);
+            assert_coremidi("MIDIPortDispose", result);
+        }
+
+        free(output);
+    }
 }
 
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
@@ -173,11 +183,12 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
         request.data = message.data;
         request.bytesToSend = xx message.count;
 
-        err := MIDISendSysex(*request);
-        if err  return false;
+        result := MIDISendSysex(*request);
+        assert_coremidi("MIDISendSysex", result);
+        if result != noErr  return false;
 
         // @Hack @Speed MIDISendSysex works asynchronously. We could roll with that, but then we need to keep the
-        // MIDISysexSendRequest alive somewhere, configure a callback for completion and then free the request. Meh.
+        // MIDISysexSendRequest alive somewhere, configure a callback for completion and then free the request.
         while !request.complete {
             sleep_milliseconds(1);
         }
@@ -194,7 +205,9 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     ump_message_type := UMP_Message_Type.MIDI_1_Voice;
     if is_realtime_status(status)  ump_message_type = .System_Common_Or_Real_Time;
 
-    word := make_ump_word(ump_message_type, 0, message[0], message[1], ifx message.count > 2 then message[2] else 0);
+    word := make_ump_word(ump_message_type, 0, message[0],
+                          ifx message.count > 1 then message[1] else 0,
+                          ifx message.count > 2 then message[2] else 0);
 
     packet = MIDIEventListAdd(*event_list, size_of(MIDIEventList), packet, 0 /* timestamp */, 1, *word);
     assert(packet != null);
@@ -357,14 +370,26 @@ init_input_port :: (port: *MIDIPortRef, name: string, input_block: *Objective_C_
     port_name := make_cf_string(name);
     result := MIDIInputPortCreateWithProtocol(core_midi_client, port_name, xx kMIDIProtocol._1_0, port, xx input_block);
     assert_coremidi("MIDIInputPortCreateWithProtocol", result);
-    return result == 0;
+
+    if result != noErr {
+        <<port = 0;
+        return false;
+    }
+
+    return true;
 }
 
 init_output_port :: (port: *MIDIPortRef, name: string) -> bool {
     port_name := make_cf_string(name);
     result := MIDIOutputPortCreate(core_midi_client, port_name, port);
     assert_coremidi("MIDIOutputPortCreate", result);
-    return result == 0;
+
+    if result != noErr {
+        <<port = 0;
+        return false;
+    }
+
+    return true;
 }
 
 CFSTR :: (s: *u8) -> CFStringRef #expand {
