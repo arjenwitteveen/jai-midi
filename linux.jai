@@ -243,18 +243,14 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
     return result;
 }
 
-close_output :: (using output: *MIDI_Output) {
+close_output :: (output: *MIDI_Output) {
     if output == null  return;
 
-    destination_index := index; // Store to be able to log the index after freeing the output.
-
-    if index >= 0  snd_seq_disconnect_to(output.sequencer, sender.port, destination.client, destination.port);
-    if midi_event_encoder  snd_midi_event_free(midi_event_encoder);
-    if sequencer  snd_seq_close(sequencer);
+    if output.index >= 0          snd_seq_disconnect_to(output.sequencer, output.sender.port, output.destination.client, output.destination.port);
+    if output.midi_event_encoder  snd_midi_event_free(output.midi_event_encoder);
+    if output.sequencer           snd_seq_close(output.sequencer);
 
     free(output);
-
-    if destination_index >= 0  log_verbose("Closed MIDI output for destination %.", destination_index);
 }
 
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
@@ -370,7 +366,7 @@ midi_input_thread :: (thread: *Thread) -> s64 {
 
     defer snd_midi_event_free(midi_event_decoder);
 
-    // @TODO: It seems that we can receive MIDI messages here that were given before our input even opened due to ALSA
+    // @TODO: It seems that we can receive MIDI messages here that were sent before our input even opened due to ALSA
     // buffering them internally. I have no idea how to prevent this. The promisingly named 'snd_seq_drop_input'
     // function doesn't seem to do the trick, and neither have other things I've tried. There must be some way to tell
     // ALSA to drop all pending inputs for our subscription or whatever before we start polling for events here?

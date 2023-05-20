@@ -32,7 +32,7 @@ get_source_name :: (index: int) -> string {
     return "";
 }
 
-get_destination_name :: (index: int, include_port_info := true) -> string {
+get_destination_name :: (index: int) -> string {
     destination_info, success := get_destination_info(index);
     if success  return copy_string(to_string(destination_info.product_name.data), temp);
     return "";

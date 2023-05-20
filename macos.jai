@@ -156,7 +156,7 @@ open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
     return output;
 }
 
-close_output :: (output: *MIDI_Output, reset_all_notes := false) {
+close_output :: (output: *MIDI_Output) {
     if output {
         if output.virtual_endpoint {
             assert(output.destination_endpoint == 0, "The given output seems to be a virtual output, but for some reason it has a regular destination endpoint set.");

@@ -6,8 +6,6 @@
 // The module does not aim to support all the possible functionality that MIDI (or the MIDI driver of each OS)
 // provides. There is no support for MIDI 2.0.
 //
-// To use this module you need at least Jai beta 0.1.057.
-//
 
 
 // * Getting info on endpoints.
