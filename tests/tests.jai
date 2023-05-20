@@ -121,7 +121,6 @@ midi_encode_decode_test :: () {
 midi_utilities_test :: () {
     #import "Math";
 
-    // Pitch bend value roundtrips.
     for value: int.[0, 1, 23, 435, 7235, U14_MAX] {
         pb_message := create_pitch_bend_message(value);
         output_value := pitch_bend_get_value(pb_message.pitch_bend_info);
