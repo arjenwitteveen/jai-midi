@@ -1,8 +1,6 @@
 # jai-midi
 This module aims to provide basic MIDI I/O support for Jai programs in a simple to use, cross-platform manner. It allows you to receive MIDI messages from a MIDI source, and send MIDI messages to a MIDI destination. There is also basic support for reading MIDI files. The module does not aim to support all the possible functionality that MIDI (or the MIDI driver of each OS) provides. There is no support for MIDI 2.0.
 
-To use this module you need at least Jai beta 0.1.057.
-
 ## Backends
 The following backends are used:
 
