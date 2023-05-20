@@ -20,7 +20,7 @@ main :: () {
 
     if args.count < 2 {
         print("Usage: dump_sysex source_index\n");
-        print("\nPlease provide the index of a MIDI source. There are ");
+        print("\nPlease provide the index of a MIDI source. Found ");
         print_available_midi_endpoints(include_destinations = false);
         return;
     }

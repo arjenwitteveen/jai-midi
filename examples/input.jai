@@ -9,7 +9,7 @@ main :: () {
 
     if args.count < 2 {
         print("Usage: input source_index\n\n");
-        print("Please provide the index of a MIDI source. There are ");
+        print("Please provide the index of a MIDI source. Found ");
         print_available_midi_endpoints(include_destinations = false);
         return;
     }
