@@ -2,10 +2,12 @@
 // To generate bindings: jai first.jai - generate
 //
 
+BINDINGS_DIRECTORY :: "platforms/bindings";
+
 generate_bindings :: () -> bool {
     output_filename: string;
 
-    make_directory_if_it_does_not_exist("bindings");
+    make_directory_if_it_does_not_exist(BINDINGS_DIRECTORY);
 
     options: Generate_Bindings_Options;
     {
@@ -16,7 +18,7 @@ generate_bindings :: () -> bool {
         generate_compile_time_struct_checks = true;
 
         #if OS == .WINDOWS {
-            output_filename = "bindings/windows.jai";
+            output_filename = tprint("%/windows.jai", BINDINGS_DIRECTORY);
             strip_flags = 0;
 
             array_add(*libnames, "winmm");
@@ -29,7 +31,7 @@ generate_bindings :: () -> bool {
             visitor = winmm_visitor;
         } else #if OS == .LINUX {
             // The Linux version is based on libasound/ALSA.
-            output_filename = "bindings/linux.jai";
+            output_filename = tprint("%/linux.jai", BINDINGS_DIRECTORY);
             array_add(*include_paths, "linux/alsa");
             array_add(*libpaths, "linux");
             array_add(*libnames, "libasound");
@@ -44,7 +46,7 @@ generate_bindings :: () -> bool {
             FRAMEWORKS_PATH :: #run sprint("%/System/Library/Frameworks", MACOS_SDK_PATH);
             COREMIDI_PATH :: #run sprint("%/CoreMIDI.framework/Headers", FRAMEWORKS_PATH);
 
-            output_filename = "bindings/macos.jai";
+            output_filename = tprint("%/macos.jai", BINDINGS_DIRECTORY);
             array_add(*libnames, "libc");
             array_add(*libnames, "CoreMIDI");
             array_add(*system_include_paths, GENERATOR_DEFAULT_SYSTEM_INCLUDE_PATH);

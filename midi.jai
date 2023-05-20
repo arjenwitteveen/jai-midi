@@ -1,9 +1,9 @@
 #if OS == .WINDOWS {
-    #load "windows.jai";
+    #load "platforms/windows.jai";
 } else #if OS == .LINUX {
-    #load "linux.jai";
+    #load "platforms/linux.jai";
 } else #if OS == .MACOS {
-    #load "macos.jai";
+    #load "platforms/macos.jai";
 } else {
     #assert false "The current operating system is not supported yet.";
 }
