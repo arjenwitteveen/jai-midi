@@ -8,7 +8,7 @@
     #assert false "The current operating system is not supported yet.";
 }
 
-VALIDATE_SYSTEM_EXCLUSIVE_BUFFERS :: true;
+VALIDATE_SYSTEM_EXCLUSIVE_BUFFERS :: false; // Set to true to check system-exclusive messages for impermissible values.
 
 MIDI_Input_Callback :: #type (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) -> ();
 
