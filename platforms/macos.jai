@@ -372,7 +372,7 @@ init_input_port :: (port: *MIDIPortRef, name: string, input_block: *Objective_C_
     assert_coremidi("MIDIInputPortCreateWithProtocol", result);
 
     if result != noErr {
-        <<port = 0;
+        port.* = 0;
         return false;
     }
 
@@ -385,7 +385,7 @@ init_output_port :: (port: *MIDIPortRef, name: string) -> bool {
     assert_coremidi("MIDIOutputPortCreate", result);
 
     if result != noErr {
-        <<port = 0;
+        port.* = 0;
         return false;
     }
 

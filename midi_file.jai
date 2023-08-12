@@ -126,7 +126,7 @@ read_midi_file :: (file_path: string) -> MIDI_File, bool {
                 }
 
                 case .System_Reset; { // This means a meta-event in the context of a MIDI file.
-                    type := cast(MIDI_Meta_Event_Type) <<event_cursor;
+                    type := cast(MIDI_Meta_Event_Type) event_cursor.*;
                     event_cursor += 1;
                     message_length, message_length_bytes_read := read_variable_length_quantity(event_cursor);
                     assert(message_length_bytes_read > 0, "Invalid meta-event.");
@@ -142,7 +142,7 @@ read_midi_file :: (file_path: string) -> MIDI_File, bool {
                 case; { // Regular MIDI event.
                     bytes_to_read := 2;
                     if message.status == .Program_Change || message.status == .Channel_Pressure  bytes_to_read = 1;
-                    for 0..bytes_to_read - 1  message.bytes[it] = << (event_cursor + it);
+                    for 0..bytes_to_read - 1  message.bytes[it] = (event_cursor + it).*;
                     event_cursor += bytes_to_read;
                     event.midi_event = message;
                     running_status = status_byte;
@@ -168,7 +168,7 @@ read_variable_length_quantity :: (cursor: *u8) -> u32, int {
     byte_pointer := cursor;
     while true {
         assert(byte_pointer - cursor < 4, "Variable-length quantities cannot be more than 4 bytes long.");
-        byte := <<byte_pointer;
+        byte := byte_pointer.*;
         result |= (byte & 0x7f);
         byte_pointer += 1;
         if !(byte & 0x80)  break;
@@ -179,7 +179,7 @@ read_variable_length_quantity :: (cursor: *u8) -> u32, int {
 }
 
 read :: (pointer: *u8, $T: Type) -> T #expand {
-    return << cast(*T) pointer;
+    return (cast(*T) pointer).*;
 }
 
 read_big_endian :: (pointer: *u8, $T: Type) -> T #expand {

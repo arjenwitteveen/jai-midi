@@ -24,7 +24,7 @@ assert_equal :: (a: [] u8, b: [] u8) {
 
 assert_equal :: (a: *[] u8, b: *[] u8) {
     assert(a != null && b != null, "At least one of the buffers is null.");
-    assert_equal(<<a, <<b);
+    assert_equal(a.*, b.*);
 }
 
 assert_equal :: (a: MIDI_Message, b: MIDI_Message) {

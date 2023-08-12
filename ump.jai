@@ -58,11 +58,11 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
             if status == {
                 case .Complete; {
                     assert(!decoder.system_exclusive_message_in_progress);
-                    <<data_bytes_cursor = cast(u8) MIDI_Status.System_Exclusive;
+                    data_bytes_cursor.* = cast(u8) MIDI_Status.System_Exclusive;
                     data_bytes_cursor += 1;
                 }
                 case .Start; {
-                    <<data_bytes_cursor = cast(u8) MIDI_Status.System_Exclusive;
+                    data_bytes_cursor.* = cast(u8) MIDI_Status.System_Exclusive;
                     data_bytes_cursor += 1;
                 }
                 case .Continue; {
@@ -70,22 +70,22 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
                 }
             }
 
-            <<(data_bytes_cursor + 0) = cast(u8) ((word >> 8) & 0xff);
-            <<(data_bytes_cursor + 1) = cast(u8) ((word >> 0) & 0xff);
+            (data_bytes_cursor + 0).* = cast(u8) ((word >> 8) & 0xff);
+            (data_bytes_cursor + 1).* = cast(u8) ((word >> 0) & 0xff);
 
             if number_of_bytes_in_packet > 2 {
                 word = words.data[1];
-                <<(data_bytes_cursor + 2) = cast(u8) ((word >> 24) & 0xff);
-                <<(data_bytes_cursor + 3) = cast(u8) ((word >> 16) & 0xff);
-                <<(data_bytes_cursor + 4) = cast(u8) ((word >>  8) & 0xff);
-                <<(data_bytes_cursor + 5) = cast(u8) ((word >>  0) & 0xff);
+                (data_bytes_cursor + 2).* = cast(u8) ((word >> 24) & 0xff);
+                (data_bytes_cursor + 3).* = cast(u8) ((word >> 16) & 0xff);
+                (data_bytes_cursor + 4).* = cast(u8) ((word >>  8) & 0xff);
+                (data_bytes_cursor + 5).* = cast(u8) ((word >>  0) & 0xff);
                 num_words_decoded += 1;
             }
 
             data_bytes_cursor += number_of_bytes_in_packet;
 
             if status == .End {
-                <<data_bytes_cursor = cast(u8) MIDI_Status.End_Of_System_Exclusive;
+                data_bytes_cursor.* = cast(u8) MIDI_Status.End_Of_System_Exclusive;
                 data_bytes_cursor += 1;
             }
 

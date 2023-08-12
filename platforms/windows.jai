@@ -130,7 +130,7 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
         return !error_out(unprepare_header_result);
     }
 
-    word := << cast(*u32) message.data;
+    word := (cast(*u32) message.data).*;
     out_result := midiOutShortMsg(output.handle, word);
     return !error_out(out_result);
 }
@@ -232,7 +232,7 @@ init_sysex_buffers :: (input: *MIDI_Input) -> MMRESULT {
         header := *input.sysex_buffer_headers[it];
         buffer := *input.sysex_buffers[it];
 
-        <<header = .{}; // Clear header struct.
+        header.* = .{}; // Clear header struct.
         header.lpData = buffer.data;
         header.dwBufferLength = xx buffer.count;
 
