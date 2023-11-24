@@ -34,7 +34,7 @@ main :: () {
     args := get_command_line_arguments();
 
     if args.count < 3 {
-        print("Usage: input source_index destination_index\n");
+        print("Usage: thru source_index destination_index\n");
         print("\nPlease provide the index of a MIDI source and destination:\n\n");
         print_available_midi_endpoints();
         return;

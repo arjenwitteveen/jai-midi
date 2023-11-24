@@ -1,7 +1,7 @@
 main :: () {
     args := get_command_line_arguments();
     if args.count != 2 {
-        print("Usage: read_file <path to MIDI file>\n");
+        print("Usage: read_midi_file midi_file_path\n");
         return;
     }
 
