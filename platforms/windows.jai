@@ -8,7 +8,7 @@ get_number_of_destinations :: () -> int {
 
 get_source_info :: (index: int) -> MIDI_Source_Info, bool {
     result: MIDI_Source_Info;
-    mmresult := midiInGetDevCaps(cast(u64) index, xx *result, size_of(MIDIINCAPS));
+    mmresult := midiInGetDevCaps(cast(u64) index, xx *result, size_of(MIDI_Source_Info));
     if mmresult != .NOERROR {
         log_error("Error getting information on source % (%).", index, mmresult);
         return result, false;
@@ -18,7 +18,7 @@ get_source_info :: (index: int) -> MIDI_Source_Info, bool {
 
 get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
     result: MIDI_Destination_Info;
-    mmresult := midiOutGetDevCaps(cast(u64) index, xx *result, size_of(MIDIOUTCAPS));
+    mmresult := midiOutGetDevCaps(cast(u64) index, xx *result, size_of(MIDI_Destination_Info));
     if mmresult != .NOERROR {
         log_error("Error getting information on destination % (%).", index, mmresult);
         return result, false;
@@ -152,6 +152,9 @@ MIDI_Source_Info :: struct {
     driver_version: MMVERSION;
     product_name: [MAXPNAMELEN] u8;
     support: MIDICAPS;
+    manufacturer_guid: GUID;
+    product_guid: GUID;
+    name_guid: GUID;
 }
 
 MIDI_Destination_Info :: struct {
@@ -164,10 +167,13 @@ MIDI_Destination_Info :: struct {
     notes: u16;
     channel_mask: u16;
     support: MIDICAPS;
+    manufacturer_guid: GUID;
+    product_guid: GUID;
+    name_guid: GUID;
 }
 
-#assert size_of(MIDIINCAPS) == size_of(MIDI_Source_Info);
-#assert size_of(MIDIOUTCAPS) == size_of(MIDI_Destination_Info);
+#assert size_of(MIDIINCAPS2) == size_of(MIDI_Source_Info);
+#assert size_of(MIDIOUTCAPS2) == size_of(MIDI_Destination_Info);
 
 #scope_file
 
