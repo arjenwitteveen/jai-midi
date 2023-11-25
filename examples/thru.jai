@@ -1,10 +1,10 @@
-// This example program opens an output and an input. The input uses a callback function which gets a pointer to the
-// output as user data; the input callback logs each MIDI message and passes it on to the output, so this program
-// functions as a sort of MIDI passthrough.
+// This example program opens an output and an input. Messages received in the input's callback are placed in a queue,
+// which the main thread then consumes and sends to the output, so this program functions as a sort of MIDI passthrough.
 //
-// The example also showcases a simple message queue that can be shared between two threads, where one thread queues
-// messages, and another dequeues them. Why not call send_midi_message from the callback directly? Well, not every MIDI
-// driver allows making calls to its API from the callback.
+// It is important to realize that in general your input callbacks will run on a separate thread. This example showcases
+// a simple message queue that can be shared between two threads, where one thread queues messages, and another dequeues
+// them. Why not call send_midi_message from the callback directly? Well, not every MIDI driver allows making calls to
+// its API from the callback.
 
 LOG_MESSAGES :: true;
 QUEUE_SIZE :: 16;
