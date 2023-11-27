@@ -23,7 +23,7 @@ get_source_name :: (index: int) -> string {
     if endpoint {
         cfstring: CFStringRef;
         result := MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, *cfstring);
-        if result == noErr  return cfstring_to_string(cfstring);
+        if result == noErr  return to_string(cfstring);
     }
 
     return "";
@@ -34,7 +34,7 @@ get_destination_name :: (index: int) -> string {
     if endpoint {
         cfstring: CFStringRef;
         result := MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, *cfstring);
-        if result == noErr  return cfstring_to_string(cfstring);
+        if result == noErr  return to_string(cfstring);
     }
 
     return "";
@@ -267,7 +267,7 @@ get_endpoint_info :: (endpoint: MIDIEndpointRef) -> MIDI_Endpoint_Info, bool {
     get_string_property :: (property: CFStringRef) -> string #expand {
         value: CFStringRef;
         status := MIDIObjectGetStringProperty(endpoint, property, *value);
-        if status == noErr  return cfstring_to_string(value);
+        if status == noErr  return to_string(value);
         return "";
     }
 
@@ -406,21 +406,6 @@ make_cf_string :: ($defer_release := true) -> CFStringRef #expand {
     cfstring: CFStringRef;
     #if defer_release  `defer CFRelease(cfstring);
     return cfstring;
-}
-
-// @Note: This is a copy of to_string in the macos module, since that one contains some bugs at the moment.
-cfstring_to_string :: (cfstring: CFStringRef) -> string {
-    c_string := CFStringGetCStringPtr(cfstring, .UTF8);
-    if c_string     return to_string(c_string);
-
-    // Slow path: The CFString is not encoded in UTF-8, so it needs to be transcoded...
-    utf16_length := CFStringGetLength(cfstring);
-    max_size := CFStringGetMaximumSizeForEncoding(utf16_length, .UTF8);
-    data := context.allocator.proc(.ALLOCATE, max_size + 1, 0, null, context.allocator.data);
-    success := CFStringGetCString(cfstring, data, max_size + 1, .UTF8);
-    if !success     return ""; // This should not happen since the buffer is supposedly big enough
-
-    return to_string(cast(*u8) data);
 }
 
 mach_timestamp_to_apollo_time :: (timestamp: u64) -> Apollo_Time #expand {
