@@ -460,8 +460,8 @@ get_port_info :: (sequencer: *snd_seq_t, index: int, source: bool) -> MIDI_Port_
 
             if current_index - 1 == index {
                 client_name := snd_seq_client_info_get_name(client_info);
-                result.client_name = copy_string(to_string(client_name), temp);
-                result.port_name = copy_string(to_string(port_name), temp);
+                result.client_name = copy_temporary_string(to_string(client_name));
+                result.port_name = copy_temporary_string(to_string(port_name));
                 result.client_number = client_number;
                 result.port_number = port_number;
 
