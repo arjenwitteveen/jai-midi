@@ -86,7 +86,10 @@ do_examples :: (build: bool, clean: bool) {
             options.output_path = EXAMPLES_PATH;
             options.output_type = .EXECUTABLE;
             options.output_executable_name = file_name_without_extension;
-            options.minimum_macos_version = .{12, 0};
+
+            #if OS == .MACOS {
+                options.minimum_os_version = .{12, 0};
+            }
 
             set_build_options(options, w);
 

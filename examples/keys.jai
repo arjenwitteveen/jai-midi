@@ -78,7 +78,7 @@ main :: () {
 
     quit := false;
     while !quit {
-        current_time = get_time();
+        current_time = seconds_since_init();
         dt := cast(float)(current_time - last_time);
         Clamp(*dt, 0, 0.1);
         last_time = current_time;
