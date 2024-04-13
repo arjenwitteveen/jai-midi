@@ -9,8 +9,14 @@ main :: () {
 
     if args.count < 2 {
         print("Usage: input source_index\n\n");
-        print("Please provide the index of a MIDI source. Found ");
-        print_available_midi_endpoints(include_destinations = false);
+        print("Please provide the index of a MIDI source. Available sources:\n");
+
+        number_of_sources := get_number_of_sources();
+        for 0..number_of_sources - 1 {
+            source_name := get_source_name(it);
+            print("[%] %\n", it, source_name);
+        }
+
         return;
     }
 
@@ -37,5 +43,3 @@ INPUT_WAIT_SECONDS :: 10;
 
 #import,file "../module.jai";
 #import "Basic";
-
-#load "shared.jai";

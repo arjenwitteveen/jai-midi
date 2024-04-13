@@ -139,3 +139,37 @@
 
 #load "midi.jai";
 #load "midi_file.jai";
+#load "queue.jai";
+
+// Utility function used in the examples, which can also be useful for debugging.
+print_message_info :: (using message: MIDI_Message, timestamp: Apollo_Time) {
+    f :: (value: int, digits := 2) -> FormatInt #expand { return FormatInt.{value=value, base=16, minimum_digits=digits}; }
+
+    print("%", status);
+    if status < .Pitch_Bend  print(" (channel %): ", channel);
+    else                             print(": ");
+
+    if status == {
+        case .Note_On; #through;
+        case .Note_Off;            print("note = 0x%, velocity = 0x%", f(note_info.note), f(note_info.velocity));
+        case .Polyphonic_Pressure; print("note = 0x%, pressure = 0x%", f(polyphonic_pressure_info.note), f(polyphonic_pressure_info.pressure));
+        case .Control_Change;      print("controller = 0x%, value = 0x%", f(control_change_info.controller), f(control_change_info.value));
+        case .Program_Change;      print("program = 0x%", f(program_change_info.program));
+        case .Channel_Pressure;    print("pressure = 0x%", f(channel_pressure_info.pressure));
+        case .Pitch_Bend;          print("value = 0x% (%)", f(pitch_bend_get_value(pitch_bend_info), digits=4), formatFloat(pitch_bend_get_float(pitch_bend_info), trailing_width = 2, zero_removal = .NO));
+
+        case .System_Exclusive; {
+            data := system_exclusive_info.buffer;
+            print("data (% bytes):\n", data.count);
+            for data {
+                print("0x%", FormatInt.{value=it, base=16, minimum_digits=2});
+                if it_index != data.count - 1 {
+                    if (it_index + 1) % 16 == 0 print("\n"); else print(" ");
+                }
+            }
+        }
+    }
+
+    print(" @ % ms ", to_milliseconds(timestamp));
+    print("\n");
+}

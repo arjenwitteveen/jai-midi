@@ -63,7 +63,7 @@ do_examples :: (build: bool, clean: bool) {
 
     for file: examples {
         path_found, base_path, file_name := split_from_right(file, #char "/");
-        if !path_found || file_name == "shared.jai" || !ends_with(file_name, ".jai")  continue;
+        if !path_found || !ends_with(file_name, ".jai")  continue;
 
         extension_found, file_name_without_extension, extension := split_from_right(file_name, ".");
         assert(extension_found);

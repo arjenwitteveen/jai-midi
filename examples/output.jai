@@ -5,8 +5,14 @@ main :: () {
 
     if args.count < 2 {
         print("Usage: output destination_index\n\n");
-        print("Please provide the index of a MIDI destination. Found ");
-        print_available_midi_endpoints(include_sources = false);
+        print("Please provide the index of a MIDI destination. Available destinations:\n");
+
+        number_of_destinations := get_number_of_destinations();
+        for 0..number_of_destinations - 1 {
+            destination_name := get_destination_name(it);
+            print("[%] %\n", it, destination_name);
+        }
+
         return;
     }
 
@@ -41,9 +47,6 @@ main :: () {
     }
 }
 
+#import,file "../module.jai";
 #import "Basic";
 #import "Random";
-
-#import,file "../module.jai";
-
-#load "shared.jai";

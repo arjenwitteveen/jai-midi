@@ -1,32 +1,19 @@
 // This example program opens an output and an input. Messages received in the input's callback are placed in a queue,
 // which the main thread then consumes and sends to the output, so this program functions as a sort of MIDI passthrough.
 //
-// It is important to realize that in general your input callbacks will run on a separate thread. This example showcases
-// a simple message queue that can be shared between two threads, where one thread queues messages, and another dequeues
-// them. Why not call send_midi_message from the callback directly? Well, not every MIDI driver allows making calls to
-// its API from the callback.
+// It is important to realize that in general your input callbacks will run on a separate thread. The module includes a
+// simple single producer/single consumer queue to handle message passing between the callback and the main program, but
+// you might want to roll your own solution for 'real' programs. And why not call send_midi_message from the callback
+// directly? Well, not every MIDI driver allows making calls to its API from the callback.
 
 LOG_MESSAGES :: true;
-QUEUE_SIZE :: 16;
-
-Callback_Data :: struct {
-    message_queue: [QUEUE_SIZE] MIDI_Message;
-    read_semaphore: Semaphore;
-    write_semaphore: Semaphore;
-    read_cursor: int;
-    write_cursor: int;
-}
 
 midi_input_callback :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) {
     #if LOG_MESSAGES  print_message_info(message, timestamp);
 
     if message.status < .System_Exclusive {
-        using callback_data := cast(*Callback_Data) user_data;
-        if wait_for(*write_semaphore, 1) == .SUCCESS {
-            message_queue[write_cursor] = message;
-            signal(*read_semaphore);
-            write_cursor = (write_cursor + 1) % QUEUE_SIZE;
-        }
+        queue := cast(*MIDI_Queue) user_data;
+        queue_message(queue, message);
     }
 }
 
@@ -35,8 +22,22 @@ main :: () {
 
     if args.count < 3 {
         print("Usage: thru source_index destination_index\n");
-        print("\nPlease provide the index of a MIDI source and destination:\n\n");
-        print_available_midi_endpoints();
+        print("\nPlease provide the index of a MIDI source and destination.\n");
+
+        print("\nAvailable sources:\n");
+        number_of_sources := get_number_of_sources();
+        for 0..number_of_sources - 1 {
+            source_name := get_source_name(it);
+            print("[%] %\n", it, source_name);
+        }
+
+        print("\nAvailable destinations:\n");
+        number_of_destinations := get_number_of_destinations();
+        for 0..number_of_destinations - 1 {
+            destination_name := get_destination_name(it);
+            print("[%] %\n", it, destination_name);
+        }
+
         return;
     }
 
@@ -52,12 +53,12 @@ main :: () {
         return;
     }
 
-    callback_data: Callback_Data;
-    init(*callback_data.read_semaphore);
-    init(*callback_data.write_semaphore, QUEUE_SIZE);
+    queue: MIDI_Queue;
+    init(*queue);
+    defer deinit(*queue);
 
     if source_index >= 0 && destination_index >= 0 {
-        input  := open_input(source_index, midi_input_callback, *callback_data);
+        input  := open_input(source_index, midi_input_callback, *queue);
         output := open_output(destination_index);
         defer close_input(input);
         defer close_output(output);
@@ -66,12 +67,8 @@ main :: () {
             print("Made a connection from source % to destination %. Press Ctrl+C to quit.\n", source_index, destination_index);
 
             while true {
-                if wait_for(*callback_data.read_semaphore) == .SUCCESS {
-                    message := callback_data.message_queue[callback_data.read_cursor];
-                    send_midi_message(output, message);
-                    signal(*callback_data.write_semaphore);
-                    callback_data.read_cursor = (callback_data.read_cursor + 1) % QUEUE_SIZE;
-                }
+                received_message, message := dequeue_message(*queue);
+                if received_message  send_midi_message(output, message);
             }
         }
     }
@@ -79,6 +76,3 @@ main :: () {
 
 #import,file "../module.jai";
 #import "Basic";
-#import "Thread";
-
-#load "shared.jai";
