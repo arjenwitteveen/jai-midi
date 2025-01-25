@@ -137,7 +137,6 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
 
 MIDI_Input_Platform_Data :: struct {
     handle: HMIDIIN;
-    callback_context: Context;
     sysex_buffer_headers: [SYSEX_BUFFER_COUNT] MIDIHDR;
     sysex_buffers: [SYSEX_BUFFER_COUNT] [SYSEX_BUFFER_SIZE] u8;
 }
@@ -184,7 +183,7 @@ SYSEX_BUFFER_SIZE  :: 1024;
 midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64, param2: u64) #c_call {
     input := cast(*MIDI_Input) instance;
 
-    push_context input.callback_context {
+    push_context {
         // @Note: If we get an OPEN message, the MIDI_Input struct will not have its handle set yet. We could set it
         // here if we ever want to notify people of events like these.
 

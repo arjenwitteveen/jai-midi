@@ -305,8 +305,7 @@ mach_timebase_valid := false;
 midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
     input := block.input;
 
-    ctx: Context;
-    push_context ctx {
+    push_context {
         assert(event_list.protocol == xx kMIDIProtocol._1_0, "Received event list using an unsupported MIDI protocol.");
         assert(input != null, "Invalid input pointer.");
 
