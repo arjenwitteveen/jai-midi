@@ -89,25 +89,25 @@ get_destination_index_by_name :: (name: string, match_full_name := false) -> int
     return result;
 }
 
-create_midi_message :: (bytes: [] u8) -> MIDI_Message, bool {
-    result, success := decode_midi_packet(bytes);
-    return result, success;
+create_midi_message :: (bytes: [] u8) -> bool, MIDI_Message {
+    success, result := decode_midi_packet(bytes);
+    return success, result;
 }
 
-create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, channel: u8 = 0) -> MIDI_Message, bool {
+create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, channel: u8 = 0) -> MIDI_Message {
     assert(data0 <= MIDI_DATA_BYTE_MAX, "First data byte is out of range (value is %, but the maximum allowed value is %).", data0, MIDI_DATA_BYTE_MAX);
     assert(data1 <= MIDI_DATA_BYTE_MAX, "Second data byte is out of range (value is %, but the maximum allowed value is %).", data1, MIDI_DATA_BYTE_MAX);
     bytes: [3] u8;
     bytes[0] = make_status_byte(status, channel);
     bytes[1] = data0;
     bytes[2] = data1;
-    result, success := decode_midi_packet(bytes);
-    return result, success;
+    success, result := decode_midi_packet(bytes);
+    assert(success, "Tried to create an invalid MIDI packet (from bytes %).", bytes);
+    return result;
 }
 
-create_control_change_message :: (controller: Control_Change, value: u8, channel: u8 = 0) -> MIDI_Message, bool {
-    result, success := create_midi_message(.Control_Change, cast(u8) controller, value, channel);
-    return result, success;
+create_control_change_message :: (controller: Control_Change, value: u8, channel: u8 = 0) -> MIDI_Message {
+    return create_midi_message(.Control_Change, cast(u8) controller, value, channel);
 }
 
 create_pitch_bend_message :: (value: int, channel: u8 = 0) -> MIDI_Message {
@@ -300,27 +300,27 @@ encode_midi_message :: (message: MIDI_Message) -> [3] u8, int {
 }
 
 decode_midi_packet :: (input: *MIDI_Input, bytes: [] u8, timestamp: Apollo_Time) -> bool {
-    message, message_decoded := decode_midi_packet(*input.decoder, bytes);
+    message_decoded, message := decode_midi_packet(*input.decoder, bytes);
     if message_decoded  post_message_to_input(input, message, timestamp);
     return message_decoded;
 }
 
-decode_midi_packet :: (bytes: [] u8) -> MIDI_Message, bool {
+decode_midi_packet :: (bytes: [] u8) -> bool, MIDI_Message {
     decoder: MIDI_Decoder;
-    message, message_decoded := decode_midi_packet(*decoder, bytes);
-    return message, message_decoded;
+    message_decoded, message := decode_midi_packet(*decoder, bytes);
+    return message_decoded, message;
 }
 
-decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := false) -> MIDI_Message, bool {
+decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := false) -> bool, MIDI_Message {
     message: MIDI_Message;
-    if bytes.count == 0  return message, false;
+    if bytes.count == 0  return false, message;
 
     status_byte := bytes[0];
     status := get_status(status_byte);
 
     if is_realtime_status(status) {
         message.status = status;
-        return message, true;
+        return true, message;
     }
 
     if status == .System_Exclusive || decoder.system_exclusive_message_in_progress {
@@ -332,7 +332,7 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := 
                 if it != 0xf7 && it >= 0x80 {
                     assert(false, "Unexpected byte value 0x% received in system-exclusive message.", formatInt(it, base=16));
                     reset_system_exclusive_buffer(decoder);
-                    return message, false;
+                    return false, message;
                 }
             }
         }
@@ -344,18 +344,18 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := 
         if get_status(bytes[bytes.count - 1]) == .End_Of_System_Exclusive {
             decoder.system_exclusive_message_in_progress = false;
             message = create_system_exclusive_message(decoder.message_buffer);
-            return message, true;
+            return true, message;
         } else {
             decoder.system_exclusive_message_in_progress = true;
         }
 
-        return message, false;
+        return false, message;
     }
 
     if status == .Invalid {
         if decoder.running_status == 0 {
             assert(false, "Received message without status byte, but no running status is available.");
-            return message, false;
+            return false, message;
         }
 
         status_byte = decoder.running_status;
@@ -367,14 +367,14 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := 
     data_bytes := number_of_data_bytes(status);
     if bytes.count - 1 < data_bytes {
         log_error("Expected % bytes for % message, but only received % bytes.", data_bytes + 1, status, bytes.count);
-        return message, false;
+        return false, message;
     }
 
     message.status = status;
     if status < .System_Exclusive  message.channel = status_byte & 0x0f;
     for 0..data_bytes - 1  message.bytes[it] = bytes[1 + it];
 
-    return message, true;
+    return true, message;
 }
 
 post_message_to_input :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time) {

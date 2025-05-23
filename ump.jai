@@ -10,8 +10,8 @@ make_ump_word :: (message_type: UMP_Message_Type, group: u32, status_channel: u3
     return result;
 }
 
-decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bool {
-    if words.count == 0  return .{}, false;
+decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> bool, MIDI_Message {
+    if words.count == 0  return false, .{};
 
     word := words.data[0];
     message_type := cast(UMP_Message_Type) (word >> 28);
@@ -38,8 +38,8 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
             bytes[1] = cast(u8) ((word >>  8) & 0xff); // Data byte 1.
             bytes[2] = cast(u8) ((word >>  0) & 0xff); // Data byte 2.
 
-            message, message_decoded := decode_midi_packet(decoder, bytes);
-            return message, message_decoded;
+            message_decoded, message := decode_midi_packet(decoder, bytes);
+            return message_decoded, message;
         }
 
         case .Data_System_Exclusive; {
@@ -93,8 +93,8 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
             bytes.data = data_bytes.data;
             bytes.count = data_bytes_cursor - data_bytes.data;
 
-            message, message_decoded := decode_midi_packet(decoder, bytes);
-            return message, message_decoded;
+            message_decoded, message := decode_midi_packet(decoder, bytes);
+            return message_decoded, message;
         }
 
         case .MIDI_2_Voice; {
@@ -108,7 +108,7 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> MIDI_Message, bo
         }
     }
 
-    return .{}, false;
+    return false, .{};
 }
 
 UMP_Message_Type :: enum u8 {

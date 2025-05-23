@@ -324,7 +324,7 @@ midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIE
             words.count = packet.wordCount;
 
             while words.count {
-                message, message_decoded := decode_ump_words(*input.decoder, *words);
+                message_decoded, message := decode_ump_words(*input.decoder, *words);
                 if message_decoded  post_message_to_input(input, message, timestamp);
             }
         }

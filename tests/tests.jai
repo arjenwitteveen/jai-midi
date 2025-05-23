@@ -63,7 +63,7 @@ midi_encode_decode_test :: () {
         bytes.count = count;
         assert_equal(bytes, expected_bytes);
         assert(message.status == .System_Exclusive || number_of_data_bytes(message.status) + 1 == expected_bytes.count);
-        decoded := decode_midi_packet(*decoder, result);
+        _, decoded := decode_midi_packet(*decoder, result);
         assert_equal(message, decoded);
     }
 
@@ -95,7 +95,8 @@ midi_encode_decode_test :: () {
     // System common messages.
     sysex_data := u8.[0xf0, 0x42, 0x31, 0x70, 0xf7];
     sysex_message := create_system_exclusive_message(sysex_data);
-    assert_equal(sysex_message, decode_midi_packet(*decoder, sysex_data)); // We don't do encoding for system-exclusive messages, just test decoding.
+    _, sysex_message_decoded := decode_midi_packet(*decoder, sysex_data);
+    assert_equal(sysex_message, sysex_message_decoded); // We don't do encoding for system-exclusive messages, just test decoding.
 
     time_code_message := create_midi_message(.Time_Code, 0x36);
     test_message(time_code_message, u8.[0xf1, 0x36]);
@@ -152,7 +153,7 @@ system_exclusive_buffer_test :: () {
 
         buffer := u8.[0xf0, 0x12, 0x34, 0x56, 0x78, 0xf7];
 
-        message, message_decoded := decode_midi_packet(decoder, buffer);
+        message_decoded, message := decode_midi_packet(decoder, buffer);
         assert(message_decoded);
 
         assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
@@ -182,20 +183,20 @@ system_exclusive_buffer_test :: () {
         message: MIDI_Message;
         message_decoded: bool;
 
-        message, message_decoded = decode_midi_packet(decoder, buffer_1);
+        message_decoded, message = decode_midi_packet(decoder, buffer_1);
         assert(decoder.message_buffer.count == 3, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
         assert(decoder.system_exclusive_message_in_progress, "Unexpected value for system_exclusive_message_in_progress.");
         assert_equal(decoder.message_buffer, buffer_1);
         assert(!message_decoded);
 
-        message, message_decoded = decode_midi_packet(decoder, buffer_2);
+        message_decoded, message = decode_midi_packet(decoder, buffer_2);
         assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
         assert(decoder.system_exclusive_message_in_progress, "Unexpected value for system_exclusive_message_in_progress.");
         assert_equal(decoder.message_buffer, slice(buffer, 0, 6));
         assert(!message_decoded);
 
         // Send realtime message. This shouldn't interrupt the system-exclusive message handling.
-        message, message_decoded = decode_midi_packet(decoder, u8.[0xf8]);
+        message_decoded, message = decode_midi_packet(decoder, u8.[0xf8]);
         assert(message_decoded);
         assert(message.status == .Timing_Clock);
         assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
@@ -203,7 +204,7 @@ system_exclusive_buffer_test :: () {
         assert_equal(decoder.message_buffer, slice(buffer, 0, 6));
 
         // Continue with the system-exclusive message.
-        message, message_decoded = decode_midi_packet(decoder, buffer_3);
+        message_decoded, message = decode_midi_packet(decoder, buffer_3);
         assert(decoder.message_buffer.count == buffer.count, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
         assert(!decoder.system_exclusive_message_in_progress, "Unexpected value for system_exclusive_message_in_progress.");
         assert_equal(decoder.message_buffer, buffer);
