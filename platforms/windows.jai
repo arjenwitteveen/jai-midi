@@ -38,7 +38,7 @@ get_destination_name :: (index: int) -> string {
     return "";
 }
 
-open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
+open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input {
     result := New(MIDI_Input);
     success := false;
     defer if !success  close_input(result);
@@ -78,7 +78,7 @@ close_input :: (input: *MIDI_Input) {
     free_input(input);
 }
 
-open_output :: (destination_index: int) -> *MIDI_Output #must {
+open_output :: (destination_index: int) -> *MIDI_Output {
     number_of_available_outputs := midiOutGetNumDevs();
     if destination_index < 0 || destination_index >= number_of_available_outputs {
         additional_error_message := ifx number_of_available_outputs > 0 then tprint("highest available destination index is %", number_of_available_outputs - 1) else "no destinations are available";

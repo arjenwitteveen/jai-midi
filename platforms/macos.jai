@@ -40,7 +40,7 @@ get_destination_name :: (index: int) -> string {
     return "";
 }
 
-open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
+open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input {
     if !init_macos() return null;
 
     source_endpoint := MIDIGetSource(xx source_index);
@@ -73,7 +73,7 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     return input;
 }
 
-open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
+open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input {
     if !init_macos() return null;
 
     input := New(MIDI_Input);
@@ -115,7 +115,7 @@ close_input :: (input: *MIDI_Input) {
     }
 }
 
-open_output :: (destination_index: int) -> *MIDI_Output #must {
+open_output :: (destination_index: int) -> *MIDI_Output {
     if !init_macos() return null;
 
     destination_endpoint := MIDIGetDestination(xx destination_index);
@@ -137,7 +137,7 @@ open_output :: (destination_index: int) -> *MIDI_Output #must {
     return output;
 }
 
-open_virtual_output :: (output_name: string) -> *MIDI_Output #must {
+open_virtual_output :: (output_name: string) -> *MIDI_Output {
     if !init_macos() return null;
 
     output := New(MIDI_Output);

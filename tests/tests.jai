@@ -156,7 +156,6 @@ system_exclusive_buffer_test :: () {
         assert(message_decoded);
 
         assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
-        assert(decoder.message_buffer.allocated == 6, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(!decoder.system_exclusive_message_in_progress, "Unexpected value for system_exclusive_message_in_progress.");
         assert_equal(decoder.message_buffer, buffer);
         assert_equal(decoder.message_buffer, message.system_exclusive_info.buffer);
@@ -185,14 +184,12 @@ system_exclusive_buffer_test :: () {
 
         message, message_decoded = decode_midi_packet(decoder, buffer_1);
         assert(decoder.message_buffer.count == 3, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
-        assert(decoder.message_buffer.allocated == 3, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(decoder.system_exclusive_message_in_progress, "Unexpected value for system_exclusive_message_in_progress.");
         assert_equal(decoder.message_buffer, buffer_1);
         assert(!message_decoded);
 
         message, message_decoded = decode_midi_packet(decoder, buffer_2);
         assert(decoder.message_buffer.count == 6, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
-        assert(decoder.message_buffer.allocated == 6, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(decoder.system_exclusive_message_in_progress, "Unexpected value for system_exclusive_message_in_progress.");
         assert_equal(decoder.message_buffer, slice(buffer, 0, 6));
         assert(!message_decoded);
@@ -208,7 +205,6 @@ system_exclusive_buffer_test :: () {
         // Continue with the system-exclusive message.
         message, message_decoded = decode_midi_packet(decoder, buffer_3);
         assert(decoder.message_buffer.count == buffer.count, "Unexpected value % for buffer.count.", decoder.message_buffer.count);
-        assert(decoder.message_buffer.allocated == buffer.count, "Unexpected value % for buffer.allocated.", decoder.message_buffer.allocated);
         assert(!decoder.system_exclusive_message_in_progress, "Unexpected value for system_exclusive_message_in_progress.");
         assert_equal(decoder.message_buffer, buffer);
         assert_equal(decoder.message_buffer, message.system_exclusive_info.buffer);

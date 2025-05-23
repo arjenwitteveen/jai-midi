@@ -13,8 +13,6 @@ generate_bindings :: () -> bool {
     {
         using options;
 
-        array_add(*system_include_paths, GENERATOR_DEFAULT_SYSTEM_INCLUDE_PATH);
-
         generate_compile_time_struct_checks = true;
 
         #if OS == .WINDOWS {
@@ -49,8 +47,6 @@ generate_bindings :: () -> bool {
             output_filename = tprint("%/macos.jai", BINDINGS_DIRECTORY);
             array_add(*libnames, "libc");
             array_add(*libnames, "CoreMIDI");
-            array_add(*system_include_paths, GENERATOR_DEFAULT_SYSTEM_INCLUDE_PATH);
-            array_add(*system_include_paths, LIBC_PATH);
             array_add(*source_files,  tprint("%/CoreMIDI.h", COREMIDI_PATH));
             array_add(*source_files,  tprint("%/mach/mach_time.h", LIBC_PATH));
             array_add(*path_fragments_to_treat_as_non_system_paths,
@@ -161,14 +157,6 @@ alsa_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_V
 
 
 macos_visitor :: (decl: *Declaration, parent_decl: *Declaration) -> Declaration_Visit_Result {
-    // The members with type MIDITimeStamp (u64) are 8 byte aligned, but in C they are 4 byte aligned. This is a hack to get them aligned properly.
-    if decl.name == "timeStamp" {
-        midi_timestamp_type := New(CType);
-        midi_timestamp_type.size = 8;
-        midi_timestamp_type.hardcoded_jai_string = "MIDITimeStamp #align 4";
-        decl.type = midi_timestamp_type;
-    }
-
     // This is for removing an anonymous struct that contains the kMIDIInvalidUniqueID value.
     if decl.kind == .ENUM && decl.name == "" {
         en := cast(*Enum) decl;

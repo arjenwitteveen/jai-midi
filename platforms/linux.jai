@@ -40,7 +40,7 @@ get_destination_name :: (index: int) -> string {
     return "";
 }
 
-open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input #must {
+open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *void = null) -> *MIDI_Input {
     result := New(MIDI_Input);
     result.index = -1;
     result.queue_id = -1;
@@ -178,7 +178,7 @@ close_input :: (using input: *MIDI_Input) {
     free_input(input);
 }
 
-open_output :: (destination_index: int) -> *MIDI_Output #must {
+open_output :: (destination_index: int) -> *MIDI_Output {
     result := New(MIDI_Output);
     result.index = -1;
 
