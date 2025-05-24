@@ -21,8 +21,8 @@
 //
 //     Use these to get the number of available endpoints that can serve as MIDI sources or destinations.
 //
-//   get_source_info :: (index: int) -> MIDI_Source_Info, bool
-//   get_destination_info :: (index: int) -> MIDI_Destination_Info, bool
+//   get_source_info :: (index: int) -> bool, MIDI_Source_Info
+//   get_destination_info :: (index: int) -> bool, MIDI_Destination_Info
 //
 //     These functions return a struct that contains platform-specific information about an endpoint, and a boolean
 //     indicating if the query succeeded.
@@ -106,8 +106,8 @@
 // Some simple MIDI-related helper functions and enums are defined in the module. Some of the more useful ones to get
 // started are listed here.
 //
-//   create_midi_message :: (bytes: [] u8) -> MIDI_Message
-//   create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, channel: u8 = 0) -> MIDI_Message, bool
+//   create_midi_message :: (bytes: [] u8) -> bool, MIDI_Message
+//   create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, channel: u8 = 0) -> MIDI_Message
 //   create_control_change_message :: (controller: Control_Change, value: u8, channel: u8 = 0) -> MIDI_Message
 //   create_pitch_bend_message :: (value: float, channel: u8 = 0) -> MIDI_Message
 //   create_system_exclusive_message :: (data: [] u8) -> MIDI_Message
@@ -125,7 +125,7 @@
 //
 // Support for reading MIDI files is provided through midi_file.jai. The interface is very simple.
 //
-//   read_midi_file :: (file_path: string) -> MIDI_File, bool
+//   read_midi_file :: (file_path: string) -> bool, MIDI_File
 //
 //     Reads a MIDI file and returns it contents; the second return value indicates success.
 

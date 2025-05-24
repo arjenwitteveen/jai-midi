@@ -222,7 +222,7 @@ endpoint_info_test :: () {
     for 0..number_of_sources - 1 {
         source_name := get_source_name(it);
         assert(source_name.count > 0, "Source name could not be retrieved.");
-        info, info_success := get_source_info(it);
+        info_success, info := get_source_info(it);
         assert(info_success, "Source info could not be retrieved.");
         // print("%\n", info);
     }
@@ -232,7 +232,7 @@ endpoint_info_test :: () {
     for 0..number_of_destinations - 1 {
         destination_name := get_destination_name(it);
         assert(destination_name.count > 0, "Destination name could not be retrieved.");
-        info, info_success := get_destination_info(it);
+        info_success, info := get_destination_info(it);
         assert(info_success, "Destination info could not be retrieved.");
         // print("%\n", info);
     }
@@ -245,10 +245,10 @@ endpoint_info_test :: () {
     destination_name := get_destination_name(BAD_DEVICE_INDEX);
     assert(destination_name == "", "Unexpected return value '%' for get_destination_name.", destination_name);
 
-    source_info, source_info_success := get_source_info(BAD_DEVICE_INDEX);
+    source_info_success, source_info := get_source_info(BAD_DEVICE_INDEX);
     assert(!source_info_success);
 
-    destination_info, destination_info_success := get_destination_info(BAD_DEVICE_INDEX);
+    destination_info_success, destination_info := get_destination_info(BAD_DEVICE_INDEX);
     assert(!destination_info_success);
 
     assert(open_input(BAD_DEVICE_INDEX, dummy_callback) == null);

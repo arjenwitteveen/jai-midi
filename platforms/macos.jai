@@ -6,16 +6,16 @@ get_number_of_destinations :: () -> int {
     return cast(int) MIDIGetNumberOfDestinations();
 }
 
-get_source_info :: (index: int) -> MIDI_Source_Info, bool {
+get_source_info :: (index: int) -> bool, MIDI_Source_Info {
     endpoint := MIDIGetSource(cast(u32) index);
-    endpoint_info, success := get_endpoint_info(endpoint);
-    return xx endpoint_info, success;
+    success, endpoint_info := get_endpoint_info(endpoint);
+    return success, xx endpoint_info;
 }
 
-get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
+get_destination_info :: (index: int) -> bool, MIDI_Destination_Info {
     endpoint := MIDIGetDestination(cast(u32) index);
-    endpoint_info, success := get_endpoint_info(endpoint);
-    return xx endpoint_info, success;
+    success, endpoint_info := get_endpoint_info(endpoint);
+    return success, xx endpoint_info;
 }
 
 get_source_name :: (index: int) -> string {
@@ -258,7 +258,7 @@ MIDI_Endpoint_Info :: struct {
     driver_version: int;
 }
 
-get_endpoint_info :: (endpoint: MIDIEndpointRef) -> MIDI_Endpoint_Info, bool {
+get_endpoint_info :: (endpoint: MIDIEndpointRef) -> bool, MIDI_Endpoint_Info {
     result: MIDI_Endpoint_Info;
     if !endpoint  return result, false;
 
@@ -289,7 +289,7 @@ get_endpoint_info :: (endpoint: MIDIEndpointRef) -> MIDI_Endpoint_Info, bool {
     // @Incomplete: We could get way more property values here, although I feel a lot of them are either not relevant,
     // or not filled out consistently.
 
-    return result, success;
+    return success, result;
 }
 
 Objective_C_Block_MIDI_Input :: struct {

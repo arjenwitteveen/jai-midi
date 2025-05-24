@@ -10,32 +10,32 @@ get_number_of_destinations :: () -> int {
     return 0;
 }
 
-get_source_info :: (index: int) -> MIDI_Source_Info, bool {
+get_source_info :: (index: int) -> bool, MIDI_Source_Info {
     sequencer_success := with_sequencer();
     if sequencer_success {
-        info, info_success := get_port_info(sequencer, index, source = true);
-        if info_success  return xx info, true;
+        info_success, info := get_port_info(sequencer, index, source = true);
+        if info_success  return true, xx info;
     }
-    return .{}, false;
+    return false, .{};
 }
 
-get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
+get_destination_info :: (index: int) -> bool, MIDI_Destination_Info {
     sequencer_success := with_sequencer();
     if sequencer_success {
-        info, info_success := get_port_info(sequencer, index, source = false);
-        if info_success  return xx info, true;
+        info_success, info := get_port_info(sequencer, index, source = false);
+        if info_success  return true, xx info;
     }
-    return .{}, false;
+    return false, .{};
 }
 
 get_source_name :: (index: int) -> string {
-    info, success := get_source_info(index);
+    success, info := get_source_info(index);
     if success  return tprint("% (%) %:%", info.client_name, info.port_name, info.client_number, info.port_number);
     return "";
 }
 
 get_destination_name :: (index: int) -> string {
-    info, success := get_destination_info(index);
+    success, info := get_destination_info(index);
     if success  return tprint("% (%) %:%", info.client_name, info.port_name, info.client_number, info.port_number);
     return "";
 }
@@ -63,7 +63,7 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
         return null;
     }
 
-    port_info, port_found := get_port_info(result.sequencer, source_index, source = true);
+    port_found, port_info := get_port_info(result.sequencer, source_index, source = true);
     if !port_found {
         log_error("Could not find MIDI source with index %.", source_index);
         return null;
@@ -200,7 +200,7 @@ open_output :: (destination_index: int) -> *MIDI_Output {
         return null;
     }
 
-    port_info, port_found := get_port_info(result.sequencer, destination_index, source = false);
+    port_found, port_info := get_port_info(result.sequencer, destination_index, source = false);
     if !port_found {
         log_error("Could not find MIDI destination with index %.", destination_index);
         return null;
@@ -430,7 +430,7 @@ MIDI_Port_Info :: struct {
     timestamp_queue_id: s32;
 }
 
-get_port_info :: (sequencer: *snd_seq_t, index: int, source: bool) -> MIDI_Port_Info, bool {
+get_port_info :: (sequencer: *snd_seq_t, index: int, source: bool) -> bool, MIDI_Port_Info {
     result: MIDI_Port_Info;
     current_index: int;
     client_info: *snd_seq_client_info_t;
@@ -478,12 +478,12 @@ get_port_info :: (sequencer: *snd_seq_t, index: int, source: bool) -> MIDI_Port_
                 result.timestamping_realtime_mode = snd_seq_port_info_get_timestamp_real(port_info) == 1;
                 result.timestamp_queue_id = snd_seq_port_info_get_timestamp_queue(port_info);
 
-                return result, true;
+                return true, result;
             }
         }
     }
 
-    return result, false;
+    return false, result;
 }
 
 get_port_count :: (sequencer: *snd_seq_t, source := true) -> int {

@@ -6,34 +6,34 @@ get_number_of_destinations :: () -> int {
     return midiOutGetNumDevs();
 }
 
-get_source_info :: (index: int) -> MIDI_Source_Info, bool {
+get_source_info :: (index: int) -> bool, MIDI_Source_Info {
     result: MIDI_Source_Info;
     mmresult := midiInGetDevCaps(cast(u64) index, xx *result, size_of(MIDI_Source_Info));
     if mmresult != .NOERROR {
         log_error("Error getting information on source % (%).", index, mmresult);
-        return result, false;
+        return false, result;
     }
-    return result, true;
+    return true, result;
 }
 
-get_destination_info :: (index: int) -> MIDI_Destination_Info, bool {
+get_destination_info :: (index: int) -> bool, MIDI_Destination_Info {
     result: MIDI_Destination_Info;
     mmresult := midiOutGetDevCaps(cast(u64) index, xx *result, size_of(MIDI_Destination_Info));
     if mmresult != .NOERROR {
         log_error("Error getting information on destination % (%).", index, mmresult);
-        return result, false;
+        return false, result;
     }
-    return result, true;
+    return true, result;
 }
 
 get_source_name :: (index: int) -> string {
-    source_info, success := get_source_info(index);
+    success, source_info := get_source_info(index);
     if success  return copy_temporary_string(to_string(source_info.product_name.data));
     return "";
 }
 
 get_destination_name :: (index: int) -> string {
-    destination_info, success := get_destination_info(index);
+    success, destination_info := get_destination_info(index);
     if success  return copy_temporary_string(to_string(destination_info.product_name.data));
     return "";
 }
@@ -218,7 +218,7 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
         }
 
         if midi_event_bytes.count > 0 {
-            message, message_decoded := decode_midi_packet(*input.decoder, midi_event_bytes);
+            message_decoded, message := decode_midi_packet(*input.decoder, midi_event_bytes);
             if message_decoded {
                 post_message_to_input(input, message, timestamp);
 
