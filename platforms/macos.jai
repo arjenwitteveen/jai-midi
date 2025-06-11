@@ -260,7 +260,7 @@ MIDI_Endpoint_Info :: struct {
 
 get_endpoint_info :: (endpoint: MIDIEndpointRef) -> bool, MIDI_Endpoint_Info {
     result: MIDI_Endpoint_Info;
-    if !endpoint  return result, false;
+    if !endpoint  return false, result;
 
     success := true;
 
