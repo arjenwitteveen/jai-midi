@@ -70,6 +70,8 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
         return null;
     }
 
+    init_input_context(input);
+
     return input;
 }
 
@@ -92,6 +94,8 @@ open_virtual_input :: (input_name: string, callback: MIDI_Input_Callback, user_d
         return null;
     }
 
+    init_input_context(input);
+
     return input;
 }
 
@@ -111,6 +115,7 @@ close_input :: (input: *MIDI_Input) {
             assert_coremidi("MIDIPortDispose", result);
         }
 
+        deinit_input_context(input);
         free_input(input);
     }
 }
@@ -305,7 +310,17 @@ mach_timebase_valid := false;
 midi_input_callback :: (block: *Objective_C_Block_MIDI_Input, event_list: *MIDIEventList, src_conn_ref_con: *void) #c_call {
     input := block.input;
 
-    push_context {
+    if input.callback_context.thread_index == 0 {
+        thread_id: u64;
+        POSIX.pthread_threadid_np(null, *thread_id);
+        input.callback_context.thread_index = xx thread_id; // We have to truncate the thread ID.
+    }
+
+    callback_context := input.callback_context;
+
+    push_context callback_context {
+        defer reset_temporary_storage();
+
         assert(event_list.protocol == xx kMIDIProtocol._1_0, "Received event list using an unsupported MIDI protocol.");
         assert(input != null, "Invalid input pointer.");
 
@@ -425,3 +440,4 @@ assert_coremidi :: (procedure_name: string, result: OSStatus) #expand {
 #load "../ump.jai";
 
 #import "Objective_C";
+POSIX :: #import "POSIX";
