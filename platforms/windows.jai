@@ -53,6 +53,7 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
     result.index = source_index;
     result.callback = callback;
     result.callback_data = user_data;
+    init_input_context(result);
 
     open_result := midiInOpen(*result.handle, cast(u32) source_index, cast(u64) cast(*void) midi_input_callback, cast(u64) result, CALLBACK_FUNCTION);
     if error_in(open_result, "Unable to open MIDI device for input")  return null;
@@ -75,6 +76,8 @@ close_input :: (input: *MIDI_Input) {
     reset_result := midiInReset(input.handle);
     deinit_sysex_buffers(input);
     close_result := midiInClose(input.handle);
+
+    deinit_input_context(input);
     free_input(input);
 }
 
@@ -183,7 +186,12 @@ SYSEX_BUFFER_SIZE  :: 1024;
 midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64, param2: u64) #c_call {
     input := cast(*MIDI_Input) instance;
 
-    push_context {
+    callback_context := input.callback_context;
+    callback_context.thread_index = Windows.GetCurrentThreadId();
+
+    push_context callback_context {
+        defer reset_temporary_storage();
+
         // @Note: If we get an OPEN message, the MIDI_Input struct will not have its handle set yet. We could set it
         // here if we ever want to notify people of events like these.
 
@@ -336,3 +344,5 @@ _error :: (result: MMRESULT, message: string = "", $midi_in: bool) -> bool {
 }
 
 #load "bindings/windows.jai";
+
+Windows :: #import "Windows";

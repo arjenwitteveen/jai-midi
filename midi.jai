@@ -16,6 +16,8 @@ MIDI_Input :: struct {
     index: int;
     callback: MIDI_Input_Callback;
     callback_data: *void;
+    callback_context: #Context;
+    callback_temporary_storage: Temporary_Storage;
     decoder: MIDI_Decoder;
     using platform_data: MIDI_Input_Platform_Data;
 }
@@ -390,6 +392,34 @@ post_message_to_input :: (input: *MIDI_Input, message: MIDI_Message, timestamp: 
 reset_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {
     array_reset_keeping_memory(*decoder.message_buffer);
     decoder.system_exclusive_message_in_progress = false;
+}
+
+init_input_context :: (using input: *MIDI_Input, temporary_storage_size := 16384) {
+    // We capture the current context, and store in on the input. Each time a MIDI callback fires, we
+    // push a copy of the stored context. Each platform is resonsible for setting a proper thread index
+    // on the context during a callback.
+
+    callback_context                  = context;
+    callback_context.allocator        = context.allocator;
+    callback_context.logger           = context.logger;
+    callback_context.logger_data      = context.logger_data;
+    callback_context.assertion_failed = context.assertion_failed;
+    callback_context.stack_trace      = null;
+
+    ts := *input.callback_temporary_storage;
+    ts.size = temporary_storage_size;
+    ts.data = alloc(ts.size);
+    ts.total_bytes_occupied = 0;
+    ts.high_water_mark = 0;
+
+    callback_context.temporary_storage = ts;
+}
+
+deinit_input_context :: (using input: *MIDI_Input) {
+    // Free temporary storage.
+    ts := *input.callback_temporary_storage;
+    reset_temporary_storage(ts);
+    free(ts.data,, input.callback_context.allocator);
 }
 
 log_verbose :: (format: string, args: ..Any) #expand {
