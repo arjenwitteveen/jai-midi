@@ -187,7 +187,6 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
     input := cast(*MIDI_Input) instance;
 
     callback_context := input.callback_context;
-    callback_context.thread_index = Windows.GetCurrentThreadId();
 
     push_context callback_context {
         defer reset_temporary_storage();
@@ -344,5 +343,3 @@ _error :: (result: MMRESULT, message: string = "", $midi_in: bool) -> bool {
 }
 
 #load "bindings/windows.jai";
-
-Windows :: #import "Windows";
