@@ -127,7 +127,7 @@
 //
 //   read_midi_file :: (file_path: string) -> bool, MIDI_File
 //
-//     Reads a MIDI file and returns it contents; the second return value indicates success.
+//     Reads a MIDI file and returns it contents; the first return value indicates success.
 
 
 // * Further reading

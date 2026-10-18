@@ -301,12 +301,6 @@ encode_midi_message :: (message: MIDI_Message) -> [3] u8, int {
     return result, data_bytes + 1;
 }
 
-decode_midi_packet :: (input: *MIDI_Input, bytes: [] u8, timestamp: Apollo_Time) -> bool {
-    message_decoded, message := decode_midi_packet(*input.decoder, bytes);
-    if message_decoded  post_message_to_input(input, message, timestamp);
-    return message_decoded;
-}
-
 decode_midi_packet :: (bytes: [] u8) -> bool, MIDI_Message {
     decoder: MIDI_Decoder;
     message_decoded, message := decode_midi_packet(*decoder, bytes);

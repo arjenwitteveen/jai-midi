@@ -143,7 +143,7 @@ open_input :: (source_index: int, callback: MIDI_Input_Callback, user_data: *voi
 close_input :: (using input: *MIDI_Input) {
     if input == null  return;
 
-    // Shudown callback thread.
+    // Shutdown callback thread.
     if input.thread.index {
         dummy: u8 = 0xcd;
         write(thread_notification_pipe_write, *dummy, 1);
@@ -373,6 +373,8 @@ midi_input_thread :: (thread: *Thread) -> s64 {
 
     while poll(poll_descriptors.data, xx poll_descriptors.count, -1) >= 0 {
         while snd_seq_event_input_pending(sequencer, 1) > 0 {
+            defer reset_temporary_storage();
+
             event: *snd_seq_event_t;
             snd_seq_event_input(sequencer, *event);
 
@@ -396,7 +398,11 @@ midi_input_thread :: (thread: *Thread) -> s64 {
             midi_event_bytes.count = number_of_bytes;
 
             timestamp := seconds_to_apollo(event.time.time.tv_sec) + nanoseconds_to_apollo(event.time.time.tv_nsec);
-            decode_midi_packet(input, midi_event_bytes, timestamp);
+
+            message_decoded, message := decode_midi_packet(*input.decoder, midi_event_bytes);
+            if message_decoded {
+                post_message_to_input(input, message, timestamp);
+            }
         }
 
         if thread_notification_pollfd.revents & POLLIN { // Our own event to stop the thread.
