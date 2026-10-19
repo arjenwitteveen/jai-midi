@@ -45,11 +45,11 @@ MIDI_Meta_Event_Type :: enum u8 {
     Sequencer_Specific_Meta_Event :: 0x7f;
 }
 
-read_midi_file :: (file_path: string) -> MIDI_File, bool {
+read_midi_file :: (file_path: string) -> bool, MIDI_File {
     result: MIDI_File;
 
     file_content, read_success := read_entire_file(file_path);
-    if !read_success  return result, false;
+    if !read_success  return false, result;
 
     result.content = file_content;
 
@@ -57,7 +57,7 @@ read_midi_file :: (file_path: string) -> MIDI_File, bool {
     cursor := result.content.data;
     if file_content.count < 14 || !is_header_type(cursor) {
         log_error("File did not start with a valid MIDI header chunk.");
-        return result, false;
+        return false, result;
     }
 
     cursor += 4;
@@ -71,7 +71,7 @@ read_midi_file :: (file_path: string) -> MIDI_File, bool {
         // Read track chunk.
         if !is_track_type(cursor) {
             log_error("Expected a MIDI track chunk, but we did not find it.");
-            return result, false;
+            return false, result;
         }
 
         track: MIDI_Track;
@@ -157,7 +157,7 @@ read_midi_file :: (file_path: string) -> MIDI_File, bool {
         array_add(*result.tracks, track);
     }
 
-    return result, true;
+    return true, result;
 }
 
 #scope_file
