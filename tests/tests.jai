@@ -5,7 +5,7 @@
 VERBOSE_LOGGING :: false;
 CLIENT_NAME :: "";
 
-MIDI_FILE_DIRECTORY :: "../midi_files";
+MIDI_FILE_DIRECTORY :: "../../midi_files";
 
 // We don't directly #import the module, since we want to be able to test functions in module scope.
 #load "../midi.jai";

@@ -8,8 +8,6 @@
     #assert false "The current operating system is not supported yet.";
 }
 
-VALIDATE_SYSTEM_EXCLUSIVE_BUFFERS :: false; // Set to true to check system-exclusive messages for impermissible values.
-
 MIDI_Input_Callback :: #type (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time, user_data: *void) -> ();
 
 MIDI_Input :: struct {
@@ -319,33 +317,37 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := 
         return true, message;
     }
 
-    if status == .System_Exclusive || decoder.system_exclusive_message_in_progress {
-        #if VALIDATE_SYSTEM_EXCLUSIVE_BUFFERS {
-            for bytes {
-                if it_index == 0 && !decoder.system_exclusive_message_in_progress
-                    continue; // Skip the .System_Exclusive status byte.
+    // System-exclusive message handling.
+    {
+        is_system_exclusive_payload: bool;
 
-                if it != 0xf7 && it >= 0x80 {
-                    assert(false, "Unexpected byte value 0x% received in system-exclusive message.", formatInt(it, base=16));
-                    reset_system_exclusive_buffer(decoder);
-                    return false, message;
-                }
+        if decoder.system_exclusive_message_in_progress {
+            if status_byte < 0x80 {
+                is_system_exclusive_payload = true;
+            } else {
+                reset_system_exclusive_buffer(decoder);
+                log_verbose("System-exclusive message was interrupted.");
             }
         }
 
-        // We skip the copy if we're handling UMP messages; in that case the bytes have already been placed in the buffer.
-        if !skip_copy_bytes  array_add(*decoder.message_buffer, ..bytes);
-        decoder.running_status = 0;
-
-        if get_status(bytes[bytes.count - 1]) == .End_Of_System_Exclusive {
-            decoder.system_exclusive_message_in_progress = false;
-            message = create_system_exclusive_message(decoder.message_buffer);
-            return true, message;
-        } else {
+        if status == .System_Exclusive {
+            reset_system_exclusive_buffer(decoder);
             decoder.system_exclusive_message_in_progress = true;
         }
 
-        return false, message;
+        if status == .System_Exclusive || is_system_exclusive_payload {
+            // We skip the copy if we're handling UMP messages; in that case the bytes have already been placed in the buffer.
+            if !skip_copy_bytes  array_add(*decoder.message_buffer, ..bytes);
+            decoder.running_status = 0;
+
+            if get_status(bytes[bytes.count - 1]) == .End_Of_System_Exclusive {
+                decoder.system_exclusive_message_in_progress = false;
+                message = create_system_exclusive_message(decoder.message_buffer);
+                return true, message;
+            }
+
+            return false, message;
+        }
     }
 
     if status == .Invalid {
@@ -367,24 +369,24 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := 
     }
 
     message.status = status;
-    if status < .System_Exclusive  message.channel = status_byte & 0x0f;
-    for 0..data_bytes - 1  message.bytes[it] = bytes[1 + it];
+
+    if status < .System_Exclusive {
+        message.channel = status_byte & 0x0f;
+    }
+
+    for 0..data_bytes - 1 {
+        message.bytes[it] = bytes[1 + it];
+    }
 
     return true, message;
 }
 
 post_message_to_input :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time) {
-    if input.decoder.system_exclusive_message_in_progress && message.status < .System_Exclusive {
-        reset_system_exclusive_buffer(*input.decoder);
-        input.decoder.system_exclusive_message_in_progress = false;
-        log_verbose("System-exclusive message was interrupted.");
-    }
-
-    input.callback(input, message, timestamp, input.callback_data);
+    if input.callback  input.callback(input, message, timestamp, input.callback_data);
 }
 
 reset_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {
-    array_reset_keeping_memory(*decoder.message_buffer);
+    array_reset(*decoder.message_buffer);
     decoder.system_exclusive_message_in_progress = false;
 }
 
