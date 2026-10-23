@@ -89,21 +89,15 @@ get_destination_index_by_name :: (name: string, match_full_name := false) -> int
     return result;
 }
 
-create_midi_message :: (bytes: [] u8) -> bool, MIDI_Message {
-    success, result := decode_midi_packet(bytes);
-    return success, result;
-}
-
 create_midi_message :: (status: MIDI_Status, data0: u8 = 0, data1: u8 = 0, channel: u8 = 0) -> MIDI_Message {
     assert(data0 <= MIDI_DATA_BYTE_MAX, "First data byte is out of range (value is %, but the maximum allowed value is %).", data0, MIDI_DATA_BYTE_MAX);
     assert(data1 <= MIDI_DATA_BYTE_MAX, "Second data byte is out of range (value is %, but the maximum allowed value is %).", data1, MIDI_DATA_BYTE_MAX);
-    bytes: [3] u8;
-    bytes[0] = make_status_byte(status, channel);
-    bytes[1] = data0;
-    bytes[2] = data1;
-    success, result := decode_midi_packet(bytes);
-    assert(success, "Tried to create an invalid MIDI packet (from bytes %).", bytes);
-    return result;
+    message: MIDI_Message;
+    message.status = status;
+    message.channel = channel;
+    message.bytes[0] = data0;
+    message.bytes[1] = data1;
+    return message;
 }
 
 create_control_change_message :: (controller: Control_Change, value: u8, channel: u8 = 0) -> MIDI_Message {
@@ -118,7 +112,7 @@ create_pitch_bend_message :: (value: int, channel: u8 = 0) -> MIDI_Message {
 }
 
 create_pitch_bend_message :: (value: float, channel: u8 = 0) -> MIDI_Message {
-    int_value := cast(int) (((clamp(value, -1.0, 1.0) + 1.0) / 2.0) * U14_MAX);
+    int_value := cast(int) clamp(cast(int, 8192 + value * 8192), 0, U14_MAX);
     return create_pitch_bend_message(int_value, channel);
 }
 
@@ -131,14 +125,20 @@ create_system_exclusive_message :: (data: [] u8) -> MIDI_Message {
 }
 
 send_midi_message :: (output: *MIDI_Output, message: MIDI_Message) -> bool {
+    storage: [3] u8;
+    payload: [] u8;
+
     if message.status == .System_Exclusive {
-        return send_midi_message(output, message.system_exclusive_info.buffer);
+        payload = message.system_exclusive_info.buffer;
+    } else {
+        payload = storage;
+        payload[0] = make_status_byte(message.status, message.channel);
+        payload[1] = message.bytes[0];
+        payload[2] = message.bytes[1];
+        payload.count = number_of_data_bytes(message.status);
     }
 
-    bytes, byte_count := encode_midi_message(message);
-    message_bytes: [] u8 = bytes;
-    message_bytes.count = byte_count;
-    return send_midi_message(output, message_bytes);
+    return send_midi_message(output, payload);
 }
 
 send_midi_messages :: (output: *MIDI_Output, messages: [] MIDI_Message) -> bool {
@@ -299,12 +299,6 @@ encode_midi_message :: (message: MIDI_Message) -> [3] u8, int {
     return result, data_bytes + 1;
 }
 
-decode_midi_packet :: (bytes: [] u8) -> bool, MIDI_Message {
-    decoder: MIDI_Decoder;
-    message_decoded, message := decode_midi_packet(*decoder, bytes);
-    return message_decoded, message;
-}
-
 decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Message {
     message: MIDI_Message;
     if bytes.count == 0  return false, message;
@@ -317,29 +311,24 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Messa
         return true, message;
     }
 
-    if is_system_common_status(status) {
-        decoder.running_status = 0;
-    }
-
     // System-exclusive message handling.
     {
-        is_system_exclusive_payload: bool;
-
         if decoder.system_exclusive_message_in_progress {
-            if status_byte < 0x80 {
-                is_system_exclusive_payload = true;
-            } else {
+            is_lone_end_of_system_exclusive_message_byte := status == .End_Of_System_Exclusive && bytes.count == 1;
+
+            // If we receive a packet starting with a byte that has its high bit set, the system-exclusive message is interrupted.
+            if status_byte >= 0x80 && !is_lone_end_of_system_exclusive_message_byte {
                 reset_system_exclusive_buffer(decoder);
                 log_verbose("System-exclusive message was interrupted.");
             }
         }
 
-        if status == .System_Exclusive {
-            reset_system_exclusive_buffer(decoder);
-            decoder.system_exclusive_message_in_progress = true;
-        }
+        if status == .System_Exclusive || decoder.system_exclusive_message_in_progress {
+            if !decoder.system_exclusive_message_in_progress {
+                reset_system_exclusive_buffer(decoder);
+                decoder.system_exclusive_message_in_progress = true;
+            }
 
-        if status == .System_Exclusive || is_system_exclusive_payload {
             array_add(*decoder.system_exclusive_message_buffer, ..bytes);
 
             if get_status(bytes[bytes.count - 1]) == .End_Of_System_Exclusive {
@@ -352,9 +341,13 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Messa
         }
     }
 
+    if is_system_common_status(status) {
+        decoder.running_status = 0;
+    }
+
     if status == .Invalid {
         if decoder.running_status == 0 {
-            assert(false, "Received message without status byte, but no running status is available.");
+            log_verbose("Received message without status byte, but no running status is available.");
             return false, message;
         }
 
@@ -384,7 +377,13 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Messa
 }
 
 post_message_to_input :: (input: *MIDI_Input, message: MIDI_Message, timestamp: Apollo_Time) {
-    if input.callback  input.callback(input, message, timestamp, input.callback_data);
+    if input.callback {
+        input.callback(input, message, timestamp, input.callback_data);
+    }
+
+    if message.status == .System_Exclusive {
+        reset_system_exclusive_buffer(*input.decoder);
+    }
 }
 
 reset_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {

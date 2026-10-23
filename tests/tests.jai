@@ -122,6 +122,22 @@ midi_encode_decode_test :: () {
 midi_utilities_test :: () {
     #import "Math";
 
+    // create_pitch_bend_message(float) tests
+    pb_neutral_message := create_pitch_bend_message(0.0);
+    pb_min_message := create_pitch_bend_message(-1.0);
+    pb_max_message := create_pitch_bend_message(1.0);
+    assert(pitch_bend_get_value(pb_neutral_message.pitch_bend_info) == 8192, "Neutral pitch bend message value should be 8192, but was %.", pitch_bend_get_value(pb_neutral_message.pitch_bend_info));
+    assert(pitch_bend_get_value(pb_min_message.pitch_bend_info) == 0, "Min. pitch bend message value should be 0, but was %.", pitch_bend_get_value(pb_min_message.pitch_bend_info));
+    assert(pitch_bend_get_value(pb_max_message.pitch_bend_info) == 16383, "Min. pitch bend message value should be 16383, but was %.", pitch_bend_get_value(pb_max_message.pitch_bend_info));
+
+    // create_pitch_bend_message(int) tests
+    pb_neutral_message = create_pitch_bend_message(8192);
+    pb_min_message = create_pitch_bend_message(0);
+    pb_max_message = create_pitch_bend_message(16383);
+    assert(pitch_bend_get_value(pb_neutral_message.pitch_bend_info) == 8192, "Neutral pitch bend message value should be 8192, but was %.", pitch_bend_get_value(pb_neutral_message.pitch_bend_info));
+    assert(pitch_bend_get_value(pb_min_message.pitch_bend_info) == 0, "Min. pitch bend message value should be 0, but was %.", pitch_bend_get_value(pb_min_message.pitch_bend_info));
+    assert(pitch_bend_get_value(pb_max_message.pitch_bend_info) == 16383, "Min. pitch bend message value should be 16383, but was %.", pitch_bend_get_value(pb_max_message.pitch_bend_info));
+
     for value: int.[0, 1, 23, 435, 7235, U14_MAX] {
         pb_message := create_pitch_bend_message(value);
         output_value := pitch_bend_get_value(pb_message.pitch_bend_info);
