@@ -213,6 +213,9 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
                 header := cast(*MIDIHDR) param1;
                 midi_event_bytes.data = xx header.lpData;
                 midi_event_bytes.count = header.dwBytesRecorded;
+
+                // @Note: When the system-exclusive buffers are flushed, for instance when an input is closed, it is
+                // normal to receive a zero-length LONGDATA message here. These should be ignored.
             }
 
             case .LONGERROR; {
@@ -226,15 +229,10 @@ midi_input_callback :: (handle: HMIDIIN, msg: MIM, instance: *void, param1: u64,
 
         if midi_event_bytes.count > 0 {
             message_decoded, message := decode_midi_packet(*input.decoder, midi_event_bytes);
-            if message_decoded {
-                post_message_to_input(input, message, timestamp);
 
-                if message.status == .System_Exclusive {
-                    // @Note: Windows seems to send zero-length LONGDATA messages when the input closes. We should *not*
-                    // call reset_sysex_buffers in that case, or bad things will happen!
-                    if midi_event_bytes.count > 0  reset_sysex_buffers(input);
-                }
-            }
+            if message_decoded  post_message_to_input(input, message, timestamp);
+
+            recycle_sysex_buffers(input);
         }
     }
 }
@@ -264,12 +262,11 @@ init_sysex_buffers :: (input: *MIDI_Input) -> MMRESULT {
     return .NOERROR;
 }
 
-reset_sysex_buffers :: (input: *MIDI_Input) -> bool {
+recycle_sysex_buffers :: (input: *MIDI_Input) -> bool {
     success := true;
 
-    for 0..input.sysex_buffers.count - 1 {
-        header := *input.sysex_buffer_headers[it];
-        buffer := *input.sysex_buffers[it];
+    for *buffer: input.sysex_buffers {
+        header := *input.sysex_buffer_headers[it_index];
 
         if header.dwFlags & .DONE {
             header.dwBytesRecorded = 0;
