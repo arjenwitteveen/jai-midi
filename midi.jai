@@ -57,7 +57,7 @@ MIDI_Song_Request_Info          :: struct { song: u8; }
 
 MIDI_Decoder :: struct {
     running_status: u8;
-    message_buffer: [..] u8;
+    system_exclusive_message_buffer: [..] u8;
     system_exclusive_message_in_progress: bool;
 }
 
@@ -280,7 +280,7 @@ MIDI_CHANNEL_MAX   :: 0x0f;
 #scope_module
 
 free_input :: (input: *MIDI_Input) {
-    array_free(input.decoder.message_buffer);
+    array_free(input.decoder.system_exclusive_message_buffer);
     free(input);
 }
 
@@ -305,7 +305,7 @@ decode_midi_packet :: (bytes: [] u8) -> bool, MIDI_Message {
     return message_decoded, message;
 }
 
-decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := false) -> bool, MIDI_Message {
+decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Message {
     message: MIDI_Message;
     if bytes.count == 0  return false, message;
 
@@ -315,6 +315,10 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := 
     if is_realtime_status(status) {
         message.status = status;
         return true, message;
+    }
+
+    if is_system_common_status(status) {
+        decoder.running_status = 0;
     }
 
     // System-exclusive message handling.
@@ -336,13 +340,11 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8, skip_copy_bytes := 
         }
 
         if status == .System_Exclusive || is_system_exclusive_payload {
-            // We skip the copy if we're handling UMP messages; in that case the bytes have already been placed in the buffer.
-            if !skip_copy_bytes  array_add(*decoder.message_buffer, ..bytes);
-            decoder.running_status = 0;
+            array_add(*decoder.system_exclusive_message_buffer, ..bytes);
 
             if get_status(bytes[bytes.count - 1]) == .End_Of_System_Exclusive {
                 decoder.system_exclusive_message_in_progress = false;
-                message = create_system_exclusive_message(decoder.message_buffer);
+                message = create_system_exclusive_message(decoder.system_exclusive_message_buffer);
                 return true, message;
             }
 
@@ -386,7 +388,7 @@ post_message_to_input :: (input: *MIDI_Input, message: MIDI_Message, timestamp: 
 }
 
 reset_system_exclusive_buffer :: (decoder: *MIDI_Decoder) {
-    array_reset(*decoder.message_buffer);
+    array_reset(*decoder.system_exclusive_message_buffer);
     decoder.system_exclusive_message_in_progress = false;
 }
 
