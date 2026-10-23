@@ -7,7 +7,7 @@ main :: () {
 
     midi_file_path := args[1];
 
-    midi_file, success := read_midi_file(midi_file_path);
+    success, midi_file := read_midi_file(midi_file_path);
 
     if success {
         print("Read MIDI file (format = %, time division = %, track count = %).\n", midi_file.format, midi_file.time_division, midi_file.tracks.count);
