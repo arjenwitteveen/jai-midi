@@ -135,7 +135,7 @@ send_midi_message :: (output: *MIDI_Output, message: MIDI_Message) -> bool {
         payload[0] = make_status_byte(message.status, message.channel);
         payload[1] = message.bytes[0];
         payload[2] = message.bytes[1];
-        payload.count = number_of_data_bytes(message.status);
+        payload.count = 1 + number_of_data_bytes(message.status);
     }
 
     return send_midi_message(output, payload);
