@@ -285,7 +285,7 @@ free_input :: (input: *MIDI_Input) {
 }
 
 number_of_data_bytes :: (status: MIDI_Status) -> int {
-    if status == .System_Exclusive || status == .Tune_Request || is_realtime_status(status)  return 0;
+    if status == .System_Exclusive || status == .End_Of_System_Exclusive || status == .Tune_Request || is_realtime_status(status)  return 0;
     if status == .Channel_Pressure || status == .Program_Change || status == .Time_Code || status == .Song_Select return 1;
     return 2;
 }
@@ -311,6 +311,10 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Messa
         return true, message;
     }
 
+    if is_system_common_status(status) {
+        decoder.running_status = 0;
+    }
+
     // System-exclusive message handling.
     {
         if decoder.system_exclusive_message_in_progress {
@@ -320,6 +324,11 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Messa
             if status_byte >= 0x80 && !is_lone_end_of_system_exclusive_message_byte {
                 reset_system_exclusive_buffer(decoder);
                 log_verbose("System-exclusive message was interrupted.");
+            }
+        } else {
+            if status == .End_Of_System_Exclusive {
+                // A stray end-of-system-exclusive message. Ignore.
+                return false, .{};
             }
         }
 
@@ -339,10 +348,6 @@ decode_midi_packet :: (decoder: *MIDI_Decoder, bytes: [] u8) -> bool, MIDI_Messa
 
             return false, message;
         }
-    }
-
-    if is_system_common_status(status) {
-        decoder.running_status = 0;
     }
 
     if status == .Invalid {

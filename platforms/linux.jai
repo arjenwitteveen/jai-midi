@@ -254,42 +254,73 @@ close_output :: (output: *MIDI_Output) {
 }
 
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
+    if message.count == 0  return false;
+
     sender := output.sender;
     destination := output.destination;
-
-    encoder := output.midi_event_encoder;
-    snd_midi_event_reset_encode(encoder);
 
     event: snd_seq_event_t;
     snd_seq_ev_set_source(*event, sender.port);
     snd_seq_ev_set_subs(*event);
     snd_seq_ev_set_direct(*event);
 
-    status := get_status(message[0]);
+    if get_status(message[0]) == .System_Exclusive { // System-exclusive messages get sent out in chunks.
+        bytes_sent := 0;
 
-    if status == .System_Exclusive {
-        total_bytes_written: int;
-        while total_bytes_written < message.count {
-            bytes_written := snd_midi_event_encode(encoder, message.data + total_bytes_written, message.count - total_bytes_written, *event);
-            total_bytes_written += bytes_written;
-        }
+        while bytes_sent < message.count {
+            message_size := min(MAX_EVENT_SIZE, message.count - bytes_sent);
 
-        if cast(snd_seq_event_type) event.type != .SYSEX {
-            log_error("System-exclusive message was not encoded properly.");
-            return false;
+            snd_seq_ev_set_sysex(*event, xx message_size, message.data + bytes_sent);
+            snd_seq_ev_set_direct(*event);
+
+            success := false;
+            deadline := current_time_monotonic() + seconds_to_apollo(1);
+
+            while !success {
+                result := snd_seq_event_output_direct(output.sequencer, *event);
+
+                if result >= 0 {
+                    success = true;
+                    bytes_sent += message_size;
+                } else {
+                    if -result == {
+                        case EAGAIN; {
+                            if current_time_monotonic() > deadline {
+                                log_error("Failed to send event.");
+                                return false;
+                            }
+                        }
+                        case; {
+                            log_error("Failed to send event (error code %).", result);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            // The ALSA sequencer was designed for real-time MIDI, not for big system-exclusive messages in one go.
+            // To prevent buffering issues we need to throttle our send loop, which is annoying.
+            if bytes_sent < message.count  sleep_milliseconds(1);
         }
     } else {
-        bytes_written := snd_midi_event_encode(encoder, message.data, message.count, *event);
+        encoder := output.midi_event_encoder;
+        snd_midi_event_reset_encode(encoder);
 
-        if cast(snd_seq_event_type) event.type == .NONE {
-            log_error("Message was not encoded properly.");
+        bytes_consumed := snd_midi_event_encode(encoder, message.data, message.count, *event);
+
+        if bytes_consumed <= 0 || cast(snd_seq_event_type, event.type) == .NONE {
+            log_error("Error while encoding event.");
+            return false;
+        }
+
+        result := snd_seq_event_output_direct(output.sequencer, *event);
+        if result < 0 {
+            log_error("Error while sending event to sequencer.");
             return false;
         }
     }
 
-    output_result := snd_seq_event_output_direct(output.sequencer, *event);
-
-    return output_result >= 0;
+    return true;
 }
 
 MIDI_Input_Platform_Data :: struct {
@@ -326,7 +357,7 @@ MIDI_Destination_Info :: MIDI_Port_Info;
 
 #scope_file
 
-
+MAX_EVENT_SIZE :: 256; // Apparently ALSA will never return more than 256 bytes per message.
 
 with_sequencer :: () -> bool #expand {
     `sequencer: *snd_seq_t;
@@ -355,7 +386,6 @@ midi_input_thread :: (thread: *Thread) -> s64 {
     poll_descriptors[poll_descriptors_count].events = POLLIN;
     thread_notification_pollfd := *poll_descriptors[poll_descriptors_count];
 
-    MAX_EVENT_SIZE :: 256; // Apparently ALSA will never return more than 256 bytes per message.
     midi_event_decoder: *snd_midi_event_t;
     midi_event_result := snd_midi_event_new(MAX_EVENT_SIZE, *midi_event_decoder);
     if midi_event_result < 0  input.thread_start_success = false;
@@ -372,35 +402,60 @@ midi_input_thread :: (thread: *Thread) -> s64 {
     // ALSA to drop all pending inputs for our subscription or whatever before we start polling for events here?
 
     while poll(poll_descriptors.data, xx poll_descriptors.count, -1) >= 0 {
-        while snd_seq_event_input_pending(sequencer, 1) > 0 {
+        while true {
             defer reset_temporary_storage();
 
             event: *snd_seq_event_t;
-            snd_seq_event_input(sequencer, *event);
+
+            input_result := snd_seq_event_input(sequencer, *event);
+
+            if input_result < 0 {
+                if -input_result == {
+                    case ENOSPC; {
+                        log_error("Input queue overflowed, dropping event.");
+                        reset_system_exclusive_buffer(*input.decoder);
+                        continue;
+                    }
+
+                    case EAGAIN; {
+                        break; // No more events.
+                    }
+
+                    case; {
+                        log_error("Error in snd_seq_event_input (error code %).", input_result);
+                        break;
+                    }
+                }
+            }
 
             if event == null  continue;
 
             snd_midi_event_reset_decode(midi_event_decoder);
 
-            number_of_bytes := snd_midi_event_decode(midi_event_decoder, midi_data_buffer.data, midi_data_buffer.count, event);
-            if number_of_bytes < 0 {
-                if -number_of_bytes == {
-                    case EINVAL;  log_error("Received an invalid sequencer event.");
-                    case ENOENT;  log_error("Event is not a valid MIDI message.");
-                    case ENOMEM;  log_error("Given buffer is too small.");
+            midi_event_bytes: [] u8 = ---;
+
+            if cast(snd_seq_event_type) event.type == .SYSEX {
+                midi_event_bytes.data = event.data.ext.ptr;
+                midi_event_bytes.count = event.data.ext.len;
+            } else {
+                number_of_bytes := snd_midi_event_decode(midi_event_decoder, midi_data_buffer.data, midi_data_buffer.count, event);
+                if number_of_bytes < 0 {
+                    if -number_of_bytes == {
+                        case EINVAL;  log_error("Received an invalid sequencer event.");
+                        case ENOMEM;  log_error("Given buffer is too small.");
+                    }
+
+                    continue;
                 }
 
-                continue;
+                midi_event_bytes.data = midi_data_buffer.data;
+                midi_event_bytes.count = number_of_bytes;
             }
 
-            midi_event_bytes: [] u8 = ---;
-            midi_event_bytes.data = midi_data_buffer.data;
-            midi_event_bytes.count = number_of_bytes;
-
-            timestamp := seconds_to_apollo(event.time.time.tv_sec) + nanoseconds_to_apollo(event.time.time.tv_nsec);
-
             message_decoded, message := decode_midi_packet(*input.decoder, midi_event_bytes);
+
             if message_decoded {
+                timestamp := seconds_to_apollo(event.time.time.tv_sec) + nanoseconds_to_apollo(event.time.time.tv_nsec);
                 post_message_to_input(input, message, timestamp);
             }
         }
