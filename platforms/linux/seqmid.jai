@@ -44,7 +44,7 @@ snd_seq_ev_schedule_real :: (ev: *snd_seq_event_t, queue: u8, relative: bool, rt
     ev.flags &= ~((cast,no_check(u8) SND_SEQ_TIME_STAMP_MASK) | (cast,no_check(u8) SND_SEQ_TIME_MODE_MASK));
     ev.flags |= (cast,no_check(u8) SND_SEQ_TIME_STAMP_REAL);
     ev.flags |= ifx relative then (cast,no_check(u8) SND_SEQ_TIME_MODE_REL) else (cast,no_check(u8) SND_SEQ_TIME_MODE_ABS);
-    ev.time.time = <<rtime;
+    ev.time.time = rtime.*;
     ev.queue = queue;
 }
 
@@ -95,11 +95,11 @@ snd_seq_ev_set_queue_tempo :: (ev: *snd_seq_event_t, queue: u8, value: s32) {
     snd_seq_ev_set_queue_control(ev, snd_seq_event_type.TEMPO, queue, value);
 }
 
-snd_seq_ev_set_queue_pos_real :: (ev: *snd_seq_event_t, queue: u8, rtime: snd_seq_real_time_t) {
+snd_seq_ev_set_queue_pos_real :: (ev: *snd_seq_event_t, queue: u8, rtime: *snd_seq_real_time_t) {
     ev.type = snd_seq_event_type.SND_SEQ_EVENT_SETPOS_TIME;
     snd_seq_ev_set_dest(ev, (cast,no_check(u8) SND_SEQ_CLIENT_SYSTEM), (cast,no_check(u8) SND_SEQ_PORT_SYSTEM_TIMER));
     ev.data.queue.queue = queue;
-    ev.data.queue.param.time.time = *rtime;
+    ev.data.queue.param.time.time = rtime.*;
 }
 
 snd_seq_ev_set_queue_pos_tick :: (ev: *snd_seq_event_t, queue: u8, ttime: snd_seq_tick_time_t) {
