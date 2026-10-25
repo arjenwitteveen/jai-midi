@@ -52,7 +52,10 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> bool, MIDI_Messa
             number_of_bytes_in_packet := cast(u8) ((word >> 16) & 0xf);
             status := cast(UMP_System_Exclusive_Status) status_byte;
 
-            assert(number_of_bytes_in_packet <= 6, "Unexpected number of bytes in data packet (expected at most 6, got %).", number_of_bytes_in_packet);
+            if number_of_bytes_in_packet > 6 {
+                log_error("Unexpected number of bytes in data packet (expected at most 6, got %).", number_of_bytes_in_packet);
+                return false, .{};
+            }
 
             data_bytes: [8] u8;
             data_bytes_cursor := data_bytes.data;
