@@ -179,6 +179,8 @@ close_output :: (output: *MIDI_Output) {
 }
 
 send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
+    if message.count == 0  return false;
+
     status := get_status(message[0]);
 
     if status == .System_Exclusive {
@@ -201,6 +203,10 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
         return true;
     }
 
+    if status == .End_Of_System_Exclusive {
+        return true;
+    }
+
     event_list: MIDIEventList;
     packet := MIDIEventListInit(*event_list, xx kMIDIProtocol._1_0);
 
@@ -208,7 +214,7 @@ send_midi_message :: (output: *MIDI_Output, message: [] u8) -> bool {
     assert(message_word_count == 1);
 
     ump_message_type := UMP_Message_Type.MIDI_1_Voice;
-    if is_realtime_status(status)  ump_message_type = .System_Common_Or_Real_Time;
+    if is_system_common_status(status) || is_realtime_status(status)  ump_message_type = .System_Common_Or_Real_Time;
 
     word := make_ump_word(ump_message_type, 0, message[0],
                           ifx message.count > 1 then message[1] else 0,
