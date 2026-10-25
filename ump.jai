@@ -24,7 +24,7 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> bool, MIDI_Messa
         words.count -= num_words_decoded;
     }
 
-    if #complete  message_type == {
+    if #complete message_type == {
         case .Utility; {
             status_byte := cast(u8) ((word >> 20) & 0xf);
             // @Incomplete: Currently not handled. One use of utility messages is to transmit timestamps that can be
@@ -46,6 +46,8 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> bool, MIDI_Messa
             // @Note: The start/end marker bytes for system-exclusive messages are not included in the payload in
             // UMPs. We add them in manually, to make the output the same as in MIDI 1.0.
 
+            num_words_decoded += 1; // A system-exclusive packet is always 64 bytes, so two words.
+
             status_byte               := cast(u8) ((word >> 20) & 0xf);
             number_of_bytes_in_packet := cast(u8) ((word >> 16) & 0xf);
             status := cast(UMP_System_Exclusive_Status) status_byte;
@@ -66,7 +68,10 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> bool, MIDI_Messa
                     data_bytes_cursor += 1;
                 }
                 case .Continue; {
-                    assert(decoder.system_exclusive_message_in_progress);
+                    if !decoder.system_exclusive_message_in_progress {
+                        log_verbose("Received a system-exclusive 'continue' packet, but no 'start' packet was received.");
+                        return false, .{};
+                    }
                 }
             }
 
@@ -79,12 +84,11 @@ decode_ump_words :: (decoder: *MIDI_Decoder, words: *[] u32) -> bool, MIDI_Messa
                 (data_bytes_cursor + 3).* = cast(u8) ((word >> 16) & 0xff);
                 (data_bytes_cursor + 4).* = cast(u8) ((word >>  8) & 0xff);
                 (data_bytes_cursor + 5).* = cast(u8) ((word >>  0) & 0xff);
-                num_words_decoded += 1;
             }
 
             data_bytes_cursor += number_of_bytes_in_packet;
 
-            if status == .End {
+            if status == .End || status == .Complete {
                 data_bytes_cursor.* = cast(u8) MIDI_Status.End_Of_System_Exclusive;
                 data_bytes_cursor += 1;
             }
