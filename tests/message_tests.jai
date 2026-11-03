@@ -13,103 +13,68 @@
 //   - Linux:   the ALSA 'Midi Through' port (snd-seq-dummy), which is present on most systems.
 //   - macOS:   a virtual input created by the test itself, which the test then opens as an output.
 //
-// You can pass a different (partial) endpoint name as the first argument; it is used to find both the source and the
-// destination. If no loopback is found, part 2 is skipped. Build and run the tests with:
-//
-//   jai tests/message_tests.jai
-//   ./message_tests [loopback_name]
+// If no loopback is found, part 2 is skipped. Run them with `jai first.jai - test message`; see tests.jai for the
+// options, including how to choose the loopback.
 //
 // Some of these tests describe behavior the module doesn't have yet, so not all of them pass. Each test states the
-// intended behavior. Assertions inside the module are recorded instead of stopping the program, so one failure doesn't
-// hide the others.
+// intended behavior.
 //
 
-VERBOSE_LOGGING :: false;
-CLIENT_NAME     :: "jai-midi-message-test";
+run_message_tests :: () {
+    begin_section("Creating and encoding");
 
-// Loaded rather than imported, so that the tests can reach the encoder and decoder, which are internal to the module.
-#load "../midi.jai";
-#if OS != .MACOS {
-    #load "../ump.jai"; // On macOS, the platform layer already loads this.
+    run_test("Number of data bytes per status",                 test_number_of_data_bytes);
+    run_test("create_midi_message",                             test_create_midi_message);
+    run_test("create_midi_message rejects invalid values",      test_create_rejects_invalid_values);
+    run_test("create_control_change_message",                   test_create_control_change_message);
+    run_test("Encoding every type of message",                  test_encode_every_type);
+    run_test("Encoding every channel",                          test_encode_every_channel);
+    run_test("Encoding rejects invalid channels",               test_encode_rejects_invalid_channels);
+    run_test("Status bytes",                                    test_status_bytes);
+    run_test("Status classes",                                  test_status_classes);
+    run_test("Undefined status bytes",                          test_undefined_status_bytes);
+    run_test("14-bit values",                                   test_14_bit_values);
+    run_test("Pitch bend from an integer",                      test_pitch_bend_from_int);
+    run_test("Pitch bend from an integer out of range",         test_pitch_bend_from_int_out_of_range);
+    run_test("Pitch bend from a float",                         test_pitch_bend_from_float);
+    run_test("Pitch bend as a float",                           test_pitch_bend_get_float);
+    run_test("Pitch bend round trips",                          test_pitch_bend_round_trips);
+
+    begin_section("Decoder tests");
+
+    run_test("Decoding every type of message",                  test_decode_every_type);
+    run_test("Decoded messages through their named fields",     test_decode_named_fields);
+    run_test("Decoding every channel",                          test_decode_every_channel);
+    run_test("Smallest and largest data bytes",                 test_decode_data_byte_range);
+    run_test("Note-on with velocity 0",                         test_decode_note_on_velocity_zero);
+    run_test("Packets padded to 3 bytes",                       test_decode_padded_packets);
+    run_test("Empty packet",                                    test_decode_empty_packet);
+    run_test("Packets with too few data bytes",                 test_decode_truncated_packets);
+    run_test("Status byte where a data byte is expected",       test_decode_status_byte_as_data);
+    run_test("Decoding undefined status bytes",           test_decode_undefined_status_bytes);
+    run_test("Running status",                                  test_running_status);
+    run_test("Running status with one data byte",               test_running_status_one_data_byte);
+    run_test("Running status replaced by a new status",         test_running_status_replaced);
+    run_test("Running status kept across realtime messages",    test_running_status_kept_by_realtime);
+    run_test("Running status cancelled by system common",       test_running_status_cancelled_by_system_common);
+    run_test("System messages do not set running status",       test_running_status_not_set_by_system_messages);
+    run_test("Data bytes without running status",               test_data_without_running_status);
+    run_test("Delivery through an input",                       test_delivery_through_input);
+
+    run_test("UMP: voice messages",                             test_ump_voice_messages);
+    run_test("UMP: system messages",                            test_ump_system_messages);
+    run_test("UMP: group is ignored",                           test_ump_group_ignored);
+    run_test("UMP: several messages in one list",               test_ump_several_messages);
+    run_test("UMP: utility messages",                           test_ump_utility_messages);
+    run_test("UMP: other message types are skipped",            test_ump_other_message_types_skipped);
+
+    begin_section("Loopback tests");
+
+    loopback_name, use_virtual_endpoint := loopback_settings("jai-midi message test");
+    run_loopback_tests(loopback_name, use_virtual_endpoint);
 }
 
-#import "Atomics";
-#import "Math";
-
-#if OS == .WINDOWS {
-    DEFAULT_LOOPBACK_NAME :: "loopMIDI";
-} else #if OS == .LINUX {
-    DEFAULT_LOOPBACK_NAME :: "Midi Through";
-} else {
-    DEFAULT_LOOPBACK_NAME :: "jai-midi message test";
-}
-
-main :: () {
-    context.assertion_failed = recording_assertion_handler;
-
-    #if 1 {
-        print("\n----- Creating and encoding -----\n");
-
-        run_test("Number of data bytes per status",                 test_number_of_data_bytes);
-        run_test("create_midi_message",                             test_create_midi_message);
-        run_test("create_midi_message rejects invalid values",      test_create_rejects_invalid_values);
-        run_test("create_control_change_message",                   test_create_control_change_message);
-        run_test("Encoding every type of message",                  test_encode_every_type);
-        run_test("Encoding every channel",                          test_encode_every_channel);
-        run_test("Encoding rejects invalid channels",               test_encode_rejects_invalid_channels);
-        run_test("Status bytes",                                    test_status_bytes);
-        run_test("Status classes",                                  test_status_classes);
-        run_test("Undefined status bytes",                          test_undefined_status_bytes);
-        run_test("14-bit values",                                   test_14_bit_values);
-        run_test("Pitch bend from an integer",                      test_pitch_bend_from_int);
-        run_test("Pitch bend from an integer out of range",         test_pitch_bend_from_int_out_of_range);
-        run_test("Pitch bend from a float",                         test_pitch_bend_from_float);
-        run_test("Pitch bend as a float",                           test_pitch_bend_get_float);
-        run_test("Pitch bend round trips",                          test_pitch_bend_round_trips);
-    }
-
-    #if 1 {
-        print("\n----- Decoder tests -----\n");
-
-        run_test("Decoding every type of message",                  test_decode_every_type);
-        run_test("Decoded messages through their named fields",     test_decode_named_fields);
-        run_test("Decoding every channel",                          test_decode_every_channel);
-        run_test("Smallest and largest data bytes",                 test_decode_data_byte_range);
-        run_test("Note-on with velocity 0",                         test_decode_note_on_velocity_zero);
-        run_test("Packets padded to 3 bytes",                       test_decode_padded_packets);
-        run_test("Empty packet",                                    test_decode_empty_packet);
-        run_test("Packets with too few data bytes",                 test_decode_truncated_packets);
-        run_test("Status byte where a data byte is expected",       test_decode_status_byte_as_data);
-        run_test("Undefined status bytes",                          test_decode_undefined_status_bytes);
-        run_test("Running status",                                  test_running_status);
-        run_test("Running status with one data byte",               test_running_status_one_data_byte);
-        run_test("Running status replaced by a new status",         test_running_status_replaced);
-        run_test("Running status kept across realtime messages",    test_running_status_kept_by_realtime);
-        run_test("Running status cancelled by system common",       test_running_status_cancelled_by_system_common);
-        run_test("System messages do not set running status",       test_running_status_not_set_by_system_messages);
-        run_test("Data bytes without running status",               test_data_without_running_status);
-        run_test("Delivery through an input",                       test_delivery_through_input);
-
-        run_test("UMP: voice messages",                             test_ump_voice_messages);
-        run_test("UMP: system messages",                            test_ump_system_messages);
-        run_test("UMP: group is ignored",                           test_ump_group_ignored);
-        run_test("UMP: several messages in one list",               test_ump_several_messages);
-        run_test("UMP: utility messages",                           test_ump_utility_messages);
-        run_test("UMP: other message types are skipped",            test_ump_other_message_types_skipped);
-    }
-
-    #if 1 {
-        print("\n----- Loopback tests -----\n");
-
-        args := get_command_line_arguments();
-        use_virtual_endpoint := OS == .MACOS && args.count < 2;
-        loopback_name := ifx args.count > 1 then args[1] else DEFAULT_LOOPBACK_NAME;
-        run_loopback_tests(loopback_name, use_virtual_endpoint);
-    }
-
-    print("\n% checks passed, % failed.\n", passed_checks, failed_checks);
-    if failed_checks  exit(1);
-}
+#scope_file
 
 //
 // Test data.
@@ -993,7 +958,7 @@ run_loopback_tests :: (loopback_name: string, use_virtual_endpoint: bool) {
 
     found, input, output := open_loopback(loopback_name, use_virtual_endpoint, state);
     if !found {
-        print("Skipped: no MIDI loopback named '%' was found. See the top of this file for how to set one up.\n", loopback_name);
+        skip_test("Loopback tests", tprint("no MIDI loopback named '%' was found", loopback_name));
         return;
     }
 
@@ -1183,70 +1148,7 @@ check_message :: (actual: MIDI_Message, expected: MIDI_Message, what := "message
     return result;
 }
 
-check_bytes :: (actual: [] u8, expected: [] u8, what := "message", loc := #caller_location) {
-    if actual.count != expected.count {
-        check(false, "The % has % bytes, but % were expected.", what, actual.count, expected.count, loc = loc);
-        return;
-    }
-
-    for actual {
-        if it != expected[it_index] {
-            check(false, "The % differs at byte % (0x% instead of 0x%).", what, it_index, hex(it), hex(expected[it_index]), loc = loc);
-            return;
-        }
-    }
-
-    check(true, "");
-}
-
 // Checks that an assertion was triggered inside the module since the count was taken.
 expect_assertion :: (assertions_before: int, what: string, loc := #caller_location) {
     check(library_assertions > assertions_before, "No assertion was triggered for %.", what, loc = loc);
-}
-
-// Returns a string rather than a FormatInt, since a FormatInt would point at the parameter after it has gone away.
-hex :: (value: u8) -> string {
-    return tprint("%", formatInt(value, base = 16, minimum_digits = 2));
-}
-
-run_test :: (name: string, test: () -> ()) {
-    begin_test(name);
-    test();
-    end_test();
-}
-
-begin_test :: (name: string) {
-    print("\n%\n", name);
-    failures_at_test_start = failed_checks;
-}
-
-end_test :: () {
-    if failed_checks == failures_at_test_start  print("  ok\n");
-}
-
-failures_at_test_start: int;
-
-passed_checks: int;
-failed_checks: int;
-
-check :: (condition: bool, format: string, args: ..Any, loc := #caller_location) -> bool {
-    if condition {
-        passed_checks += 1;
-        return true;
-    }
-
-    failed_checks += 1;
-    print("  FAILED (line %): ", loc.line_number);
-    print(format, ..args);
-    print("\n");
-    return false;
-}
-
-library_assertions: int;
-
-// Reports assertions but keeps running, so that the remaining checks still run.
-recording_assertion_handler :: (loc: Source_Code_Location, message: string) -> bool {
-    library_assertions += 1;
-    print("  (assertion in %:%: %)\n", path_filename(loc.fully_pathed_filename), loc.line_number, message);
-    return false;
 }

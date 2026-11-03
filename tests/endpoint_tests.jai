@@ -12,85 +12,51 @@
 //   - Linux:   the ALSA 'Midi Through' port (snd-seq-dummy), which is present on most systems.
 //   - macOS:   a virtual output created by the test itself, which the test then opens as an input.
 //
-// You can pass a different (partial) endpoint name as the first argument; it is used to find both the source and the
-// destination. If no loopback is found, part 2 is skipped. Build and run the tests with:
-//
-//   jai tests/endpoint_tests.jai
-//   ./endpoint_tests [loopback_name]
+// If no loopback is found, part 2 is skipped. Run them with `jai first.jai - test endpoint`; see tests.jai for the
+// options, including how to choose the loopback.
 //
 // Some of these tests describe behavior the module doesn't have yet, so not all of them pass. Each test states the
-// intended behavior. Assertions inside the module are recorded instead of stopping the program, so one failure doesn't
-// hide the others.
+// intended behavior.
 //
 
-VERBOSE_LOGGING :: false;
-CLIENT_NAME     :: "jai-midi-endpoint-test";
+run_endpoint_tests :: () {
+    begin_section("Endpoint tests");
 
-// Loaded rather than imported, so that the tests can reach the decoder, which is internal to the module.
-#load "../midi.jai";
+    print("\n% source(s), % destination(s).\n", get_number_of_sources(), get_number_of_destinations());
+    for 0..get_number_of_sources() - 1       print("  source %:      %\n", it, get_source_name(it));
+    for 0..get_number_of_destinations() - 1  print("  destination %: %\n", it, get_destination_name(it));
 
-#import "Atomics";
+    run_test("Endpoint counts",                             test_endpoint_counts);
+    run_test("Every source has a name and info",            test_source_names_and_info);
+    run_test("Every destination has a name and info",       test_destination_names_and_info);
+    run_test("Invalid source indices",                      test_bad_source_indices);
+    run_test("Invalid destination indices",                 test_bad_destination_indices);
+    run_unsafe_test("Negative source indices",              test_negative_source_indices);
+    run_unsafe_test("Negative destination indices",         test_negative_destination_indices);
+    run_test("Finding endpoints by their full name",        test_find_by_full_name);
+    run_test("Finding endpoints by part of their name",     test_find_by_partial_name);
+    run_test("Full-name search ignores partial matches",    test_full_name_ignores_partial_matches);
+    run_test("Finding a name that doesn't exist",           test_find_missing_name);
+    run_test("Closing null inputs and outputs",             test_close_null);
+    run_test("Every input has its own decoder",             test_inputs_have_own_decoder);
+    #if OS == .MACOS {
+        run_test("Virtual endpoints appear and disappear",  test_virtual_endpoints);
+    }
 
-#if OS == .WINDOWS {
-    DEFAULT_LOOPBACK_NAME :: "loopMIDI";
-} else #if OS == .LINUX {
-    DEFAULT_LOOPBACK_NAME :: "Midi Through";
-} else {
-    DEFAULT_LOOPBACK_NAME :: "jai-midi endpoint test";
+    begin_section("Loopback tests");
+
+    loopback_name, use_virtual_endpoint := loopback_settings("jai-midi endpoint test");
+    run_loopback_tests(loopback_name, use_virtual_endpoint);
 }
+
+#scope_file
 
 // Indices that no system has endpoints for, besides the ones just past the end of the lists.
 LARGE_BAD_INDEX      :: 12345;
 NEGATIVE_BAD_INDICES :: int.[-1, -12345];
 
-// Tests that can crash with the current code. Enable them while working on the code they test.
-RUN_UNSAFE_TESTS :: true;
-
 // A name that no endpoint has.
 MISSING_NAME :: "jai-midi: there is no endpoint with this name";
-
-main :: () {
-    context.assertion_failed = recording_assertion_handler;
-
-    #if 1 {
-        print("\n----- Endpoint tests -----\n");
-
-        print("\n% source(s), % destination(s).\n", get_number_of_sources(), get_number_of_destinations());
-        for 0..get_number_of_sources() - 1       print("  source %:      %\n", it, get_source_name(it));
-        for 0..get_number_of_destinations() - 1  print("  destination %: %\n", it, get_destination_name(it));
-
-        run_test("Endpoint counts",                             test_endpoint_counts);
-        run_test("Every source has a name and info",            test_source_names_and_info);
-        run_test("Every destination has a name and info",       test_destination_names_and_info);
-        run_test("Invalid source indices",                      test_bad_source_indices);
-        run_test("Invalid destination indices",                 test_bad_destination_indices);
-        #if RUN_UNSAFE_TESTS {
-            run_test("Negative source indices",                 test_negative_source_indices);
-            run_test("Negative destination indices",            test_negative_destination_indices);
-        }
-        run_test("Finding endpoints by their full name",        test_find_by_full_name);
-        run_test("Finding endpoints by part of their name",     test_find_by_partial_name);
-        run_test("Full-name search ignores partial matches",    test_full_name_ignores_partial_matches);
-        run_test("Finding a name that doesn't exist",           test_find_missing_name);
-        run_test("Closing null inputs and outputs",             test_close_null);
-        run_test("Every input has its own decoder",             test_inputs_have_own_decoder);
-        #if OS == .MACOS {
-            run_test("Virtual endpoints appear and disappear",  test_virtual_endpoints);
-        }
-    }
-
-    #if 1 {
-        print("\n----- Loopback tests -----\n");
-
-        args := get_command_line_arguments();
-        use_virtual_endpoint := OS == .MACOS && args.count < 2;
-        loopback_name := ifx args.count > 1 then args[1] else DEFAULT_LOOPBACK_NAME;
-        run_loopback_tests(loopback_name, use_virtual_endpoint);
-    }
-
-    print("\n% checks passed, % failed.\n", passed_checks, failed_checks);
-    if failed_checks  exit(1);
-}
 
 //
 // Part 1: endpoint info.
@@ -513,7 +479,7 @@ send_and_expect_numbered :: (loopback: Loopback, receiver: *Receiver, count: int
 run_loopback_tests :: (loopback_name: string, use_virtual_endpoint: bool) {
     found, loopback := find_loopback(loopback_name, use_virtual_endpoint);
     if !found {
-        print("Skipped: no MIDI loopback named '%' was found. See the top of this file for how to set one up.\n", loopback_name);
+        skip_test("Loopback tests", tprint("no MIDI loopback named '%' was found", loopback_name));
         return;
     }
     defer close_output(loopback.output);
@@ -563,7 +529,7 @@ test_reopen_input :: (loopback: Loopback) {
 
 test_reopen_output :: (loopback: Loopback) {
     if loopback.destination_index < 0 {
-        print("  Skipped: the loopback output is a virtual endpoint.\n");
+        skip_current_test("the loopback output is a virtual endpoint");
         return;
     }
 
@@ -623,7 +589,7 @@ test_two_inputs_one_source :: (loopback: Loopback) {
 
 test_two_outputs_one_destination :: (loopback: Loopback) {
     if loopback.destination_index < 0 {
-        print("  Skipped: the loopback output is a virtual endpoint.\n");
+        skip_current_test("the loopback output is a virtual endpoint");
         return;
     }
 
@@ -914,51 +880,4 @@ push_silent_logger :: () {
 
 pop_logger :: () {
     context.logger = saved_logger;
-}
-
-// Returns a string rather than a FormatInt, since a FormatInt would point at the parameter after it has gone away.
-hex :: (value: u8) -> string {
-    return tprint("%", formatInt(value, base = 16, minimum_digits = 2));
-}
-
-run_test :: (name: string, test: () -> ()) {
-    begin_test(name);
-    test();
-    end_test();
-}
-
-begin_test :: (name: string) {
-    print("\n%\n", name);
-    failures_at_test_start = failed_checks;
-}
-
-end_test :: () {
-    if failed_checks == failures_at_test_start  print("  ok\n");
-}
-
-failures_at_test_start: int;
-
-passed_checks: int;
-failed_checks: int;
-
-check :: (condition: bool, format: string, args: ..Any, loc := #caller_location) -> bool {
-    if condition {
-        passed_checks += 1;
-        return true;
-    }
-
-    failed_checks += 1;
-    print("  FAILED (line %): ", loc.line_number);
-    print(format, ..args);
-    print("\n");
-    return false;
-}
-
-library_assertions: int;
-
-// Reports assertions but keeps running, so that the remaining checks still run.
-recording_assertion_handler :: (loc: Source_Code_Location, message: string) -> bool {
-    library_assertions += 1;
-    print("  (assertion in %:%: %)\n", path_filename(loc.fully_pathed_filename), loc.line_number, message);
-    return false;
 }

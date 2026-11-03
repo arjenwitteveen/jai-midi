@@ -12,68 +12,38 @@
 //   - Linux:   the ALSA 'Midi Through' port (snd-seq-dummy), which is present on most systems.
 //   - macOS:   a virtual input created by the test itself, which the test then opens as an output.
 //
-// You can pass a different (partial) endpoint name as the first argument; it is used to find both the source and the
-// destination. If no loopback is found, part 2 is skipped. Build and run the tests with:
-//
-//   jai tests/queue_tests.jai
-//   ./queue_tests [loopback_name]
+// If no loopback is found, part 2 is skipped. Run them with `jai first.jai - test queue`; see tests.jai for the
+// options, including how to choose the loopback.
 //
 // Some of these tests describe behavior the module doesn't have yet, so not all of them pass. Each test states the
-// intended behavior. Assertions inside the module are recorded instead of stopping the program, so one failure doesn't
-// hide the others.
+// intended behavior.
 //
 
-VERBOSE_LOGGING :: false;
-CLIENT_NAME     :: "jai-midi-queue-test";
+run_queue_tests :: () {
+    begin_section("Queue tests");
 
-// Loaded rather than imported, like the other tests.
-#load "../midi.jai";
-#load "../queue.jai";
+    run_test("Empty queue",                                test_empty_queue);
+    run_test("Messages come out in order",                 test_order);
+    run_test("Every type of message is kept intact",       test_message_contents);
+    run_test("Wrapping around",                            test_wrap_around);
+    run_test("Full queue",                                 test_full_queue);
+    run_test("Timeouts",                                   test_timeouts);
+    run_test("Reinitializing a queue that holds messages", test_reinitialize);
+    run_test("Consumer waits for the producer",            test_consumer_waits);
+    run_test("Producer waits for the consumer",            test_producer_waits);
+    run_test("Producer and consumer threads",              test_threads);
+    run_test("System-exclusive messages",                  test_system_exclusive);
 
-#import "Atomics";
+    begin_section("Loopback tests");
 
-#if OS == .WINDOWS {
-    DEFAULT_LOOPBACK_NAME :: "loopMIDI";
-} else #if OS == .LINUX {
-    DEFAULT_LOOPBACK_NAME :: "Midi Through";
-} else {
-    DEFAULT_LOOPBACK_NAME :: "jai-midi queue test";
+    loopback_name, use_virtual_endpoint := loopback_settings("jai-midi queue test");
+    run_loopback_tests(loopback_name, use_virtual_endpoint);
 }
+
+#scope_file
 
 // How long a timeout may take beyond what was asked for. Generous, since thread scheduling varies.
 TIMING_TOLERANCE_MS :: 500;
-
-main :: () {
-    context.assertion_failed = recording_assertion_handler;
-
-    #if 1 {
-        print("\n----- Queue tests -----\n");
-
-        run_test("Empty queue",                                test_empty_queue);
-        run_test("Messages come out in order",                 test_order);
-        run_test("Every type of message is kept intact",       test_message_contents);
-        run_test("Wrapping around",                            test_wrap_around);
-        run_test("Full queue",                                 test_full_queue);
-        run_test("Timeouts",                                   test_timeouts);
-        run_test("Reinitializing a queue that holds messages", test_reinitialize);
-        run_test("Consumer waits for the producer",            test_consumer_waits);
-        run_test("Producer waits for the consumer",            test_producer_waits);
-        run_test("Producer and consumer threads",              test_threads);
-        run_test("System-exclusive messages",                  test_system_exclusive);
-    }
-
-    #if 1 {
-        print("\n----- Loopback tests -----\n");
-
-        args := get_command_line_arguments();
-        use_virtual_endpoint := OS == .MACOS && args.count < 2;
-        loopback_name := ifx args.count > 1 then args[1] else DEFAULT_LOOPBACK_NAME;
-        run_loopback_tests(loopback_name, use_virtual_endpoint);
-    }
-
-    print("\n% checks passed, % failed.\n", passed_checks, failed_checks);
-    if failed_checks  exit(1);
-}
 
 //
 // Part 1: the queue on its own.
@@ -383,7 +353,7 @@ run_loopback_tests :: (loopback_name: string, use_virtual_endpoint: bool) {
 
     found, input, output := open_loopback(loopback_name, use_virtual_endpoint, state);
     if !found {
-        print("Skipped: no MIDI loopback named '%' was found. See the top of this file for how to set one up.\n", loopback_name);
+        skip_test("Loopback tests", tprint("no MIDI loopback named '%' was found", loopback_name));
         return;
     }
 
@@ -518,67 +488,4 @@ is_numbered :: (message: MIDI_Message, number: int) -> bool {
 check_numbered :: (message: MIDI_Message, number: int, what := "", loc := #caller_location) -> bool {
     description := ifx what then what else tprint("message %", number);
     return check(is_numbered(message, number), "Got % with data bytes % for %.", message.status, message.bytes, description, loc = loc);
-}
-
-check_bytes :: (actual: [] u8, expected: [] u8, what := "message", loc := #caller_location) {
-    if actual.count != expected.count {
-        check(false, "The % has % bytes, but % were expected.", what, actual.count, expected.count, loc = loc);
-        return;
-    }
-
-    for actual {
-        if it != expected[it_index] {
-            check(false, "The % differs at byte % (0x% instead of 0x%).", what, it_index, hex(it), hex(expected[it_index]), loc = loc);
-            return;
-        }
-    }
-
-    check(true, "");
-}
-
-// Returns a string rather than a FormatInt, since a FormatInt would point at the parameter after it has gone away.
-hex :: (value: u8) -> string {
-    return tprint("%", formatInt(value, base = 16, minimum_digits = 2));
-}
-
-run_test :: (name: string, test: () -> ()) {
-    begin_test(name);
-    test();
-    end_test();
-}
-
-begin_test :: (name: string) {
-    print("\n%\n", name);
-    failures_at_test_start = failed_checks;
-}
-
-end_test :: () {
-    if failed_checks == failures_at_test_start  print("  ok\n");
-}
-
-failures_at_test_start: int;
-
-passed_checks: int;
-failed_checks: int;
-
-check :: (condition: bool, format: string, args: ..Any, loc := #caller_location) -> bool {
-    if condition {
-        passed_checks += 1;
-        return true;
-    }
-
-    failed_checks += 1;
-    print("  FAILED (line %): ", loc.line_number);
-    print(format, ..args);
-    print("\n");
-    return false;
-}
-
-library_assertions: int;
-
-// Reports assertions but keeps running, so that the remaining checks still run.
-recording_assertion_handler :: (loc: Source_Code_Location, message: string) -> bool {
-    library_assertions += 1;
-    print("  (assertion in %:%: %)\n", path_filename(loc.fully_pathed_filename), loc.line_number, message);
-    return false;
 }

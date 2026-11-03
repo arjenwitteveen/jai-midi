@@ -11,88 +11,47 @@
 //   - Linux:   the ALSA 'Midi Through' port (snd-seq-dummy), which is present on most systems.
 //   - macOS:   a virtual input created by the test itself, which the test then opens as an output.
 //
-// You can pass a different (partial) endpoint name as the first argument; it is used to find both the source and the
-// destination. If no loopback is found, part 2 is skipped. Build and run the tests with:
-//
-//   jai tests/sysex_tests.jai
-//   ./sysex_tests [loopback_name]
+// If no loopback is found, part 2 is skipped. Run them with `jai first.jai - test sysex`; see tests.jai for the
+// options, including how to choose the loopback.
 //
 // Some of these tests describe behavior the module doesn't have yet, so not all of them pass. Each test states the
-// intended behavior. Assertions inside the module are recorded instead of stopping the program, so one failure doesn't
-// hide the others.
+// intended behavior.
 //
 
-VERBOSE_LOGGING :: false;
-CLIENT_NAME     :: "jai-midi-sysex-test";
+run_sysex_tests :: () {
+    begin_section("Decoder tests");
 
-// Loaded rather than imported, so that the tests can reach the decoder, which is internal to the module.
-#load "../midi.jai";
-#if OS != .MACOS {
-    #load "../ump.jai"; // On macOS, the platform layer already loads this.
+    run_test("Single complete message",                     test_single_packet);
+    run_test("Shortest possible message",                   test_minimal_message);
+    run_test("Consecutive messages on one decoder",         test_consecutive_messages);
+    run_test("Message split into chunks of various sizes",  test_chunk_sizes);
+    run_test("Large message",                               test_large_message);
+    run_test("Realtime message between chunks",             test_realtime_between_chunks);
+
+    // We probably will not support these, since it does not seem like something that will occur with real MIDI drivers.
+    // run_test("Realtime byte inside a chunk",                test_realtime_inside_chunk);
+    // run_test("Status byte inside a chunk ends a message",   test_status_byte_inside_chunk);
+
+    run_test("Voice message interrupts a message",          test_voice_message_interrupts);
+    run_test("New start while a message is in progress",    test_restart_while_in_progress);
+    run_test("Continuation without a start",                test_stray_continuation);
+    run_test("create_system_exclusive_message",             test_create_system_exclusive_message);
+    run_test("Delivery through an input",                   test_delivery_through_input);
+    run_test("Interrupted message through an input",        test_interrupted_delivery_through_input);
+
+    run_test("UMP: complete packets of every size",         test_ump_complete_packets);
+    run_test("UMP: start, continue and end packets",        test_ump_multi_packet);
+    run_test("UMP: message followed by a voice message",    test_ump_followed_by_voice_message);
+    run_test("UMP: continue without a start",               test_ump_stray_continue);
+    run_unsafe_test("UMP: invalid byte count",              test_ump_invalid_byte_count);
+
+    begin_section("Loopback tests");
+
+    loopback_name, use_virtual_endpoint := loopback_settings("jai-midi sysex test");
+    run_loopback_tests(loopback_name, use_virtual_endpoint);
 }
 
-#import "Atomics";
-
-// Tests that can corrupt memory or crash with the current code. Enable them while working on the code they test.
-RUN_UNSAFE_TESTS :: false;
-
-#if OS == .WINDOWS {
-    DEFAULT_LOOPBACK_NAME :: "loopMIDI";
-} else #if OS == .LINUX {
-    DEFAULT_LOOPBACK_NAME :: "Midi Through";
-} else {
-    DEFAULT_LOOPBACK_NAME :: "jai-midi sysex test";
-}
-
-// #run {
-//     main();
-// }
-
-main :: () {
-    context.assertion_failed = recording_assertion_handler;
-
-    #if 1 {
-        print("\n----- Decoder tests -----\n");
-
-        run_test("Single complete message",                     test_single_packet);
-        run_test("Shortest possible message",                   test_minimal_message);
-        run_test("Consecutive messages on one decoder",         test_consecutive_messages);
-        run_test("Message split into chunks of various sizes",  test_chunk_sizes);
-        run_test("Large message",                               test_large_message);
-        run_test("Realtime message between chunks",             test_realtime_between_chunks);
-
-        // We probably will not support these, since it does not seem like something that will occur with real MIDI drivers.
-        // run_test("Realtime byte inside a chunk",                test_realtime_inside_chunk);
-        // run_test("Status byte inside a chunk ends a message",   test_status_byte_inside_chunk);
-
-        run_test("Voice message interrupts a message",          test_voice_message_interrupts);
-        run_test("New start while a message is in progress",    test_restart_while_in_progress);
-        run_test("Continuation without a start",                test_stray_continuation);
-        run_test("create_system_exclusive_message",             test_create_system_exclusive_message);
-        run_test("Delivery through an input",                   test_delivery_through_input);
-        run_test("Interrupted message through an input",        test_interrupted_delivery_through_input);
-
-        run_test("UMP: complete packets of every size",         test_ump_complete_packets);
-        run_test("UMP: start, continue and end packets",        test_ump_multi_packet);
-        run_test("UMP: message followed by a voice message",    test_ump_followed_by_voice_message);
-        run_test("UMP: continue without a start",               test_ump_stray_continue);
-        #if RUN_UNSAFE_TESTS {
-            run_test("UMP: invalid byte count",                 test_ump_invalid_byte_count);
-        }
-    }
-
-    #if 1 {
-        print("\n----- Loopback tests -----\n");
-
-        args := get_command_line_arguments();
-        use_virtual_endpoint := OS == .MACOS && args.count < 2;
-        loopback_name := ifx args.count > 1 then args[1] else DEFAULT_LOOPBACK_NAME;
-        run_loopback_tests(loopback_name, use_virtual_endpoint);
-    }
-
-    print("\n% checks passed, % failed.\n", passed_checks, failed_checks);
-    if failed_checks  exit(1);
-}
+#scope_file
 
 //
 // Part 1: the byte-stream decoder.
@@ -576,7 +535,7 @@ run_loopback_tests :: (loopback_name: string, use_virtual_endpoint: bool) {
 
     found, input, output := open_loopback(loopback_name, use_virtual_endpoint, state);
     if !found {
-        print("Skipped: no MIDI loopback named '%' was found. See the top of this file for how to set one up.\n", loopback_name);
+        skip_test("Loopback tests", tprint("no MIDI loopback named '%' was found", loopback_name));
         return;
     }
 
@@ -735,62 +694,4 @@ slice :: (array: [] $T, start: int, count: int) -> [] T {
     result.data = array.data + start;
     result.count = count;
     return result;
-}
-
-check_bytes :: (actual: [] u8, expected: [] u8, what := "message", loc := #caller_location) {
-    if actual.count != expected.count {
-        check(false, "The % has % bytes, but % were expected.", what, actual.count, expected.count, loc = loc);
-        return;
-    }
-
-    for actual {
-        if it != expected[it_index] {
-            check(false, "The % differs at byte % (0x% instead of 0x%).", what, it_index,
-                  formatInt(it, base = 16, minimum_digits = 2), formatInt(expected[it_index], base = 16, minimum_digits = 2), loc = loc);
-            return;
-        }
-    }
-
-    check(true, "");
-}
-
-run_test :: (name: string, test: () -> ()) {
-    begin_test(name);
-    test();
-    end_test();
-}
-
-begin_test :: (name: string) {
-    print("\n%\n", name);
-    failures_at_test_start = failed_checks;
-}
-
-end_test :: () {
-    if failed_checks == failures_at_test_start  print("  ok\n");
-}
-
-failures_at_test_start: int;
-
-passed_checks: int;
-failed_checks: int;
-
-check :: (condition: bool, format: string, args: ..Any, loc := #caller_location) {
-    if condition {
-        passed_checks += 1;
-        return;
-    }
-
-    failed_checks += 1;
-    print("  FAILED (line %): ", loc.line_number);
-    print(format, ..args);
-    print("\n");
-}
-
-library_assertions: int;
-
-// Reports assertions but keeps running, so that the remaining checks still run.
-recording_assertion_handler :: (loc: Source_Code_Location, message: string) -> bool {
-    library_assertions += 1;
-    print("  (assertion in %:%: %)\n", path_filename(loc.fully_pathed_filename), loc.line_number, message);
-    return false;
 }

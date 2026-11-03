@@ -2,36 +2,15 @@
 // Tests for reading Standard MIDI Files.
 //
 // Each test builds a small MIDI file in memory, writes it to a temporary file and reads it back with read_midi_file.
-//
-// Build and run the tests with:
-//
-//   jai tests/midi_file_tests.jai
-//   ./midi_file_tests
-//
-// Some of these tests describe behavior the module doesn't have yet, so not all of them pass. Each test states the
-// intended behavior. Assertions inside the module are recorded instead of stopping the program, so one failure doesn't
-// hide the others.
-//
 // The temporary file is written to the current directory and deleted afterwards.
 //
+// Run them with `jai first.jai - test midi-file`; see tests.jai for the options.
+//
+// Some of these tests describe behavior the module doesn't have yet, so not all of them pass. Each test states the
+// intended behavior.
+//
 
-VERBOSE_LOGGING :: false;
-CLIENT_NAME     :: "jai-midi-file-test";
-
-#load "../midi.jai";
-#load "../midi_file.jai";
-
-#import "File";
-
-// Tests that can crash with the current code, because the reader reads past the end of the file. Enable them while
-// working on bounds checking.
-RUN_UNSAFE_TESTS :: false;
-
-TEMPORARY_FILE :: "midi_file_tests.tmp.mid";
-
-main :: () {
-    context.assertion_failed = recording_assertion_handler;
-
+run_midi_file_tests :: () {
     run_test("Success value is returned first",            test_return_order);
     run_test("Minimal format 0 file",                      test_minimal_format_0);
     run_test("Every channel message type",                 test_channel_message_types);
@@ -56,14 +35,14 @@ main :: () {
     run_test("Not a MIDI file",                            test_not_a_midi_file);
     run_test("Missing file",                               test_missing_file);
 
-    #if RUN_UNSAFE_TESTS {
-        run_test("Track longer than the file",             test_track_past_end_of_file);
-        run_test("Event longer than its track",            test_event_past_end_of_track);
-    }
-
-    print("\n% checks passed, % failed.\n", passed_checks, failed_checks);
-    if failed_checks  exit(1);
+    // These can crash with the current code, because the reader reads past the end of the file.
+    run_unsafe_test("Track longer than the file",          test_track_past_end_of_file);
+    run_unsafe_test("Event longer than its track",         test_event_past_end_of_track);
 }
+
+#scope_file
+
+TEMPORARY_FILE :: "midi_file_tests.tmp.mid";
 
 //
 // Well-formed files.
@@ -776,53 +755,4 @@ check_meta :: (event: MIDI_File_Event, type: MIDI_Meta_Event_Type, data: [] u8, 
 
     check(event.meta_event.type == type, "Expected meta event type %, got %.", type, event.meta_event.type, loc = loc);
     check_bytes(event.meta_event.buffer, data, tprint("% meta event", type), loc = loc);
-}
-
-check_bytes :: (actual: [] u8, expected: [] u8, what := "data", loc := #caller_location) {
-    if actual.count != expected.count {
-        check(false, "The % has % bytes, but % were expected.", what, actual.count, expected.count, loc = loc);
-        return;
-    }
-
-    for actual {
-        if it != expected[it_index] {
-            check(false, "The % differs at byte % (0x% instead of 0x%).", what, it_index,
-                  formatInt(it, base = 16, minimum_digits = 2), formatInt(expected[it_index], base = 16, minimum_digits = 2), loc = loc);
-            return;
-        }
-    }
-
-    check(true, "");
-}
-
-run_test :: (name: string, test: () -> ()) {
-    print("\n%\n", name);
-    failures_before := failed_checks;
-    test();
-    if failed_checks == failures_before  print("  ok\n");
-}
-
-passed_checks: int;
-failed_checks: int;
-
-check :: (condition: bool, format: string, args: ..Any, loc := #caller_location) -> bool {
-    if condition {
-        passed_checks += 1;
-        return true;
-    }
-
-    failed_checks += 1;
-    print("  FAILED (line %): ", loc.line_number);
-    print(format, ..args);
-    print("\n");
-    return false;
-}
-
-library_assertions: int;
-
-// Reports assertions but keeps running, so that the remaining checks still run.
-recording_assertion_handler :: (loc: Source_Code_Location, message: string) -> bool {
-    library_assertions += 1;
-    print("  (assertion in %:%: %)\n", path_filename(loc.fully_pathed_filename), loc.line_number, message);
-    return false;
 }
