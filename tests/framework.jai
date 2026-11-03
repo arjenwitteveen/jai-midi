@@ -1,7 +1,4 @@
 //
-// A small test framework shared by the test suites. tests.jai loads it together with the suites; see there for how to
-// run them.
-//
 // A suite is a procedure that runs tests with run_test, or with begin_test and end_test for tests that take arguments.
 // A test fails if any of its checks fail. Checks outside a test count towards the suite, and a failing one is reported
 // as a failure in the suite's setup. Assertions inside the module are recorded instead of stopping the program, so one
@@ -30,7 +27,7 @@ run_test_suites :: (suites: [] Test_Suite, selected: [] string) -> bool {
     }
 
     for suite: suites {
-        if selected.count {
+        if selected {
             is_selected := false;
             for selected  if it == suite.name  is_selected = true;
             if !is_selected  continue;

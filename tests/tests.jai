@@ -1,20 +1,7 @@
 //
-// Runs the test suites. Use these commands in the module's main directory:
+// Runs the test suites. Optionally pass which test suites to run.
 //
-//   jai first.jai - test [options]            Runs the tests at compile time.
-//   jai first.jai - compile-tests [options]   Builds tests/tests(.exe), which runs the tests when started.
-//
-// Options:
-//
-//   <suite>           Only run the given suite(s), for example 'sysex' or 'queue'. By default all suites run.
-//   loopback=<name>   Use the endpoints whose names contain <name> as the loopback. By default, this is "loopMIDI" on
-//                     Windows and "Midi Through" on Linux. On macOS, the suites create virtual endpoints by default.
-//   unsafe            Also run tests that can crash with the current code.
-//
-// The loopback suites (or loopback parts of suites) need a MIDI loopback; see sysex_tests.jai. They are skipped if
-// none is found.
-//
-// The build script defines AT_COMPILE_TIME, RUN_UNSAFE_TESTS, LOOPBACK_NAME and SELECTED_SUITES.
+// Example usage: jai tests.jai - [suites]
 //
 
 AT_COMPILE_TIME  :: true;
